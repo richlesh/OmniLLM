@@ -20,14 +20,18 @@ app.setAboutPanelOptions({
 let mainWin, settingsWin;
 
 function createWindow() {
-  mainWin = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1000,
     height: 700,
     icon: appIcon,
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
-  mainWin.loadFile("index.html");
-  buildMenu();
+  win.loadFile("index.html");
+  if (!mainWin) {
+    mainWin = win;
+    buildMenu();
+  }
+  return win;
 }
 
 function buildMenu() {
@@ -40,6 +44,45 @@ function buildMenu() {
         { label: "Settings…", click: openSettings },
         { type: "separator" },
         { role: "quit" }
+      ]
+    },
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "New Chat",
+          accelerator: "CmdOrCtrl+N",
+          click: () => createWindow()
+        },
+        { type: "separator" },
+        {
+          label: "Save Chat As…",
+          accelerator: "CmdOrCtrl+S",
+          click: () => BrowserWindow.getFocusedWindow()?.webContents.send("save-chat")
+        },
+        {
+          label: "Load Chat…",
+          accelerator: "CmdOrCtrl+O",
+          click: async () => {
+            const { filePaths } = await dialog.showOpenDialog(mainWin, {
+              title: "Load Chat",
+              filters: [{ name: "Chat Files", extensions: ["json"] }],
+              properties: ["openFile"]
+            });
+            if (!filePaths?.length) return;
+            const data = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
+            const win = createWindow();
+            win.webContents.once("did-finish-load", () => {
+              win.webContents.send("load-chat-data", data);
+            });
+          }
+        },
+        { type: "separator" },
+        {
+          label: "Close",
+          accelerator: "CmdOrCtrl+W",
+          click: () => BrowserWindow.getFocusedWindow()?.close()
+        }
       ]
     },
     { role: "editMenu" },
@@ -62,6 +105,39 @@ function openSettings() {
   settingsWin.loadFile("settings.html");
   settingsWin.on("closed", () => { settingsWin = null; });
 }
+
+ipcMain.handle("save-chat-dialog", async (_event, data) => {
+  const win = BrowserWindow.getFocusedWindow() || mainWin;
+  const { filePath } = await dialog.showSaveDialog(win, {
+    title: "Save Chat",
+    defaultPath: path.join(require("os").homedir(), "Documents", "chat.json"),
+    filters: [{ name: "Chat Files", extensions: ["json"] }]
+  });
+  if (!filePath) return false;
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+  return true;
+});
+
+ipcMain.handle("fetch-models", async (_event, { vendor, apiKey }) => {
+  try {
+    const baseURLs = {
+      alibaba:  "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      deepseek: "https://api.deepseek.com",
+      meta:     "https://api.llama.com/compat/v1",
+      google:   "https://generativelanguage.googleapis.com/v1beta/openai"
+    };
+    if (vendor === "anthropic") {
+      const client = new Anthropic({ apiKey });
+      const res = await client.models.list();
+      return res.data.map(m => m.id).sort();
+    }
+    const client = new OpenAI({ apiKey, baseURL: baseURLs[vendor] });
+    const res = await client.models.list();
+    return res.data.map(m => m.id).sort();
+  } catch {
+    return null; // fall back to config.json defaults
+  }
+});
 
 ipcMain.handle("settings-get-data", () => ({ settings: load(), VENDORS }));
 

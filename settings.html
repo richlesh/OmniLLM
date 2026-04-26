@@ -75,7 +75,7 @@
 
     let vendors, current;
 
-    ipcRenderer.invoke("settings-get-data").then(({ settings, VENDORS }) => {
+    ipcRenderer.invoke("settings-get-data").then(async ({ settings, VENDORS }) => {
       vendors = VENDORS;
       current = settings;
 
@@ -87,8 +87,7 @@
       }
 
       vendorSel.value = current.vendor;
-      populateModels(current.vendor);
-      modelSel.value = current.model;
+      await populateModels(current.vendor, current.model);
       apiKeyIn.value = current.apiKeys[current.vendor] || "";
       updateLink(current.vendor);
     });
@@ -97,20 +96,35 @@
       apiKeyLink.href = vendors[vendor].apiKeyUrl;
     }
 
-    function populateModels(vendor) {
+    async function populateModels(vendor, savedModel) {
+      modelSel.innerHTML = "<option disabled>Loading…</option>";
+      const apiKey = current.apiKeys[vendor] || "";
+      let models = null;
+      if (apiKey) models = await ipcRenderer.invoke("fetch-models", { vendor, apiKey });
+      if (!models) models = vendors[vendor].models;
       modelSel.innerHTML = "";
-      for (const m of vendors[vendor].models) {
+      for (const m of models) {
         const opt = document.createElement("option");
         opt.value = m;
         opt.textContent = m;
         modelSel.appendChild(opt);
       }
+      if (savedModel && models.includes(savedModel)) modelSel.value = savedModel;
     }
 
-    vendorSel.addEventListener("change", () => {
-      populateModels(vendorSel.value);
-      apiKeyIn.value = current.apiKeys[vendorSel.value] || "";
+    vendorSel.addEventListener("change", async () => {
+      current.apiKeys[vendorSel.value] = current.apiKeys[vendorSel.value] || "";
+      apiKeyIn.value = current.apiKeys[vendorSel.value];
       updateLink(vendorSel.value);
+      await populateModels(vendorSel.value);
+    });
+
+    // re-fetch models when API key is changed
+    let keyTimer;
+    apiKeyIn.addEventListener("input", () => {
+      current.apiKeys[vendorSel.value] = apiKeyIn.value;
+      clearTimeout(keyTimer);
+      keyTimer = setTimeout(() => populateModels(vendorSel.value), 800);
     });
 
     apiKeyLink.addEventListener("click", e => {

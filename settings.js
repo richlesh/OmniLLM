@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const SETTINGS_PATH = path.join(os.homedir(), ".chatbot-settings.json");
+const SETTINGS_PATH = path.join(os.homedir(), ".llm-chatbot-settings.json");
 const { vendors: VENDORS } = require("./config.json");
 
 const DEFAULTS = { vendor: "openai", model: "gpt-4o-mini", apiKeys: {} };

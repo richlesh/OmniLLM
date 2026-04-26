@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>LLM Chatbot</title>
   <link rel="stylesheet" href="node_modules/highlight.js/styles/github-dark.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono+NL:ital,wght@0,100..800;1,100..800&display=swap">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -41,9 +42,25 @@
     .msg.assistant ul, .msg.assistant ol { margin: 0 0 8px 20px; }
     .msg.assistant li { margin-bottom: 2px; }
     .msg.assistant h1, .msg.assistant h2, .msg.assistant h3 { margin: 8px 0 4px; }
-    .msg.assistant code { background: #1a1a1a; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
-    .msg.assistant pre { margin: 8px 0; border-radius: 8px; overflow-x: auto; }
-    .msg.assistant pre code { background: none; padding: 0; font-size: 13px; }
+    .msg.assistant code { background: #1a1a1a; padding: 1px 5px; border-radius: 4px; font-size: 13px; font-family: 'JetBrains Mono NL', monospace; }
+    .msg.assistant pre { margin: 8px 0; border-radius: 8px; overflow-x: auto; position: relative; }
+    .msg.assistant pre code { background: none; padding: 0; font-size: 13px; font-family: 'JetBrains Mono NL', monospace; }
+    .code-copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: #444;
+      border: none;
+      color: #ccc;
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .msg.assistant pre:hover .code-copy-btn { opacity: 1; }
+    .code-copy-btn:hover { background: #555; color: #fff; }
     .msg.assistant blockquote { border-left: 3px solid #555; padding-left: 10px; color: #aaa; margin: 6px 0; }
     .msg.assistant a { color: #4da3ff; }
 
@@ -213,8 +230,9 @@
       ipcRenderer.invoke("image-context-menu", e.target.src);
     });
 
-    const history = [];
-    let attachedImage = null; // { base64, mediaType }
+    const history = [];  // LLM API history (text only)
+    const chatLog = [];  // full UI log including generated images
+    let attachedImage = null;
     let imagineMode = false;
 
     // --- image attach ---
@@ -260,6 +278,7 @@
 
       if (imagineMode) {
         addMessage("user", `🎨 ${text}`);
+        chatLog.push({ role: "user", content: `🎨 ${text}`, images: [] });
         const thinking = addMessage("assistant", "…");
         try {
           const url = await ipcRenderer.invoke("generate-image", text);
@@ -268,16 +287,17 @@
           img.src = url;
           thinking.appendChild(img);
           thinking.appendChild(makeImageDownloadAction(url, text));
+          chatLog.push({ role: "assistant", content: "", generatedImageUrl: url });
         } catch (err) {
           thinking.className = "msg error";
           thinking.textContent = "Error: " + err.message;
+          chatLog.pop();
         }
       } else if (attachedImage) {
         const image = attachedImage;
         const dataUrl = `data:${image.mediaType};base64,${image.base64}`;
         clearImage();
 
-        // show image + text in chat
         const userDiv = document.createElement("div");
         userDiv.className = "msg user";
         const imgEl = document.createElement("img");
@@ -292,30 +312,38 @@
         }
         chat.appendChild(userDiv);
         chat.scrollTop = chat.scrollHeight;
+        chatLog.push({ role: "user", content: text || "", images: [dataUrl] });
 
         const thinking = addMessage("assistant", "…");
         try {
           const reply = await ipcRenderer.invoke("chat-with-image", { image, text });
           thinking.innerHTML = marked.parse(reply);
+          addCodeCopyButtons(thinking);
           thinking.appendChild(makeActions(reply));
           history.push({ role: "user", content: text || "What is in this image?" });
           history.push({ role: "assistant", content: reply });
+          chatLog.push({ role: "assistant", content: reply, images: [] });
         } catch (err) {
           thinking.className = "msg error";
           thinking.textContent = "Error: " + err.message;
+          chatLog.pop();
         }
       } else {
         addMessage("user", text);
         history.push({ role: "user", content: text });
+        chatLog.push({ role: "user", content: text, images: [] });
         const thinking = addMessage("assistant", "…");
         try {
           const reply = await ipcRenderer.invoke("chat", history);
           thinking.innerHTML = marked.parse(reply);
+          addCodeCopyButtons(thinking);
           thinking.appendChild(makeActions(reply));
           history.push({ role: "assistant", content: reply });
+          chatLog.push({ role: "assistant", content: reply, images: [] });
         } catch (err) {
           thinking.className = "msg error";
           thinking.textContent = "Error: " + err.message;
+          chatLog.pop();
         }
       }
 
@@ -372,6 +400,88 @@
       b.innerHTML = svgHtml;
       return b;
     }
+
+    function addCodeCopyButtons(el) {
+      el.querySelectorAll("pre").forEach(pre => {
+        const copyBtn = document.createElement("button");
+        copyBtn.className = "code-copy-btn";
+        copyBtn.textContent = "Copy";
+        copyBtn.addEventListener("click", () => {
+          navigator.clipboard.writeText(pre.querySelector("code").innerText);
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => copyBtn.textContent = "Copy", 1500);
+        });
+        pre.appendChild(copyBtn);
+      });
+    }
+
+    // --- file menu actions ---
+    ipcRenderer.on("save-chat", async () => {
+      if (chatLog.length === 0) return;
+      const savedMessages = [];
+      for (const entry of chatLog) {
+        const msg = { role: entry.role, content: entry.content, images: [] };
+        if (entry.generatedImageUrl) {
+          // fetch remote DALL-E URL and convert to base64
+          try {
+            const res = await fetch(entry.generatedImageUrl);
+            const blob = await res.blob();
+            const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(blob); });
+            msg.images.push(dataUrl);
+            msg.generatedImage = true;
+          } catch { msg.images.push(entry.generatedImageUrl); msg.generatedImage = true; }
+        } else {
+          msg.images = entry.images || [];
+        }
+        savedMessages.push(msg);
+      }
+      await ipcRenderer.invoke("save-chat-dialog", { history, messages: savedMessages });
+    });
+
+    ipcRenderer.on("load-chat-data", async (_event, data) => {
+      history.length = 0;
+      chatLog.length = 0;
+      chat.innerHTML = "";
+      history.push(...data.history);
+
+      for (const msg of data.messages) {
+        chatLog.push(msg);
+        if (msg.role === "user") {
+          if (msg.images?.length) {
+            const div = document.createElement("div");
+            div.className = "msg user";
+            for (const src of msg.images) {
+              const img = document.createElement("img");
+              img.src = src;
+              img.style.maxWidth = "200px";
+              div.appendChild(img);
+            }
+            if (msg.content) {
+              const p = document.createElement("div");
+              p.textContent = msg.content;
+              p.style.marginTop = "6px";
+              div.appendChild(p);
+            }
+            chat.appendChild(div);
+          } else {
+            addMessage("user", msg.content);
+          }
+        } else if (msg.role === "assistant") {
+          const div = addMessage("assistant", "");
+          if (msg.generatedImage && msg.images?.length) {
+            const img = document.createElement("img");
+            img.src = msg.images[0];
+            div.appendChild(img);
+            div.appendChild(makeImageDownloadAction(msg.images[0], "image"));
+          } else {
+            div.innerHTML = marked.parse(msg.content || "");
+            addCodeCopyButtons(div);
+            div.appendChild(makeActions(msg.content || ""));
+          }
+        }
+      }
+      chat.scrollTop = chat.scrollHeight;
+    });
 
     sendBtn.addEventListener("click", send);
 

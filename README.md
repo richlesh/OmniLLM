@@ -50,7 +50,7 @@ Right-click any image in the chat to:
 - Select your **vendor** and **model** from dropdown menus
 - Each vendor stores its own **API key** separately
 - A direct link to each vendor's API key page is shown for convenience
-- Settings are saved to `~/.chatbot-settings.json`
+- Settings are saved to `~/.llm-chatbot-settings.json`
 
 ### Vendor Configuration
 Vendors, models, and API key URLs are defined in `config.json` making it easy to add new vendors or models without changing any code.
@@ -123,4 +123,4 @@ Output files are placed in the `dist/` folder.
 
 ## License
 
-ISC
+GPL 3.0

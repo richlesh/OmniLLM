@@ -3,9 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <title>LLM Chatbot</title>
-  <link rel="stylesheet" href="node_modules/highlight.js/styles/github-dark.css">
+  <link rel="stylesheet" href="node_modules/highlight.js/styles/github-dark.css" media="screen">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono+NL:ital,wght@0,100..800;1,100..800&display=swap">
   <style>
+    @media print {
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { background: #fff; color: #000; font-family: -apple-system, sans-serif; height: auto !important; overflow: visible !important; }
+      #input-area, #image-preview-wrap, .msg-actions, .code-copy-btn { display: none !important; }
+      #chat { display: block; padding: 0; height: auto !important; overflow: visible !important; }
+      .msg { max-width: 100%; border-radius: 0; margin-bottom: 12px; padding: 8px 12px; page-break-inside: avoid; }
+      .msg.user { background: #e8f0fe; color: #000; text-align: right; }
+      .msg.assistant { background: #f5f5f5; color: #000; }
+      .msg.assistant code { background: #eee; color: #000; }
+      .msg.assistant pre { background: #eee; border: 1px solid #ccc; overflow: visible !important; }
+      .msg.assistant pre code { background: none; color: #000; }
+      .msg img { max-width: 100%; }
+      a { color: #000; }
+      ::-webkit-scrollbar { display: none; }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -175,12 +190,48 @@
       flex-shrink: 0;
       transition: background 0.2s;
     }
+    #title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 16px;
+      background: #252525;
+      border-bottom: 1px solid #333;
+      min-height: 34px;
+      -webkit-app-region: drag;
+    }
+    #chat-title {
+      font-size: 13px;
+      color: #aaa;
+      cursor: pointer;
+      padding: 2px 8px;
+      border-radius: 6px;
+      -webkit-app-region: no-drag;
+    }
+    #chat-title:hover { background: #3a3a3c; color: #e0e0e0; }
+    #title-input {
+      font-size: 13px;
+      background: #3a3a3c;
+      color: #e0e0e0;
+      border: 1px solid #0a84ff;
+      border-radius: 6px;
+      padding: 2px 8px;
+      outline: none;
+      width: 300px;
+      display: none;
+      -webkit-app-region: no-drag;
+    }
+
     #send-btn:hover    { background: #0070d8; }
     #send-btn:disabled { background: #444; cursor: default; }
     #send-btn svg { pointer-events: none; }
   </style>
 </head>
 <body>
+  <div id="title-bar">
+    <span id="chat-title" title="Double-click to rename">New Chat</span>
+    <input id="title-input" type="text" maxlength="80">
+  </div>
   <div id="chat"></div>
 
   <div id="image-preview-wrap">
@@ -240,6 +291,31 @@
     const clearBtn    = document.getElementById("image-clear-btn");
     const vendorSel   = document.getElementById("vendor-select");
     const modelSel    = document.getElementById("model-select");
+    const chatTitleEl = document.getElementById("chat-title");
+    const titleInput  = document.getElementById("title-input");
+
+    let chatTitle = "New Chat";
+
+    chatTitleEl.addEventListener("dblclick", () => {
+      titleInput.value = chatTitle;
+      chatTitleEl.style.display = "none";
+      titleInput.style.display = "inline-block";
+      titleInput.focus();
+      titleInput.select();
+    });
+
+    function commitTitle() {
+      const val = titleInput.value.trim();
+      if (val) { chatTitle = val; chatTitleEl.textContent = val; document.title = val; }
+      titleInput.style.display = "none";
+      chatTitleEl.style.display = "";
+    }
+
+    titleInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") commitTitle();
+      if (e.key === "Escape") { titleInput.style.display = "none"; chatTitleEl.style.display = ""; }
+    });
+    titleInput.addEventListener("blur", commitTitle);
 
     // populate vendor/model from config + saved settings
     let allVendors = {};
@@ -366,6 +442,7 @@
           thinking.innerHTML = "";
           const img = document.createElement("img");
           img.src = url;
+          img.style.maxWidth = "200px";
           thinking.appendChild(img);
           thinking.appendChild(makeImageDownloadAction(url, text));
           chatLog.push({ role: "assistant", content: "", generatedImageUrl: url });
@@ -499,6 +576,20 @@
     }
 
     // --- file menu actions ---
+    ipcRenderer.on("export-chat", async (_event, format) => {
+      if (chatLog.length === 0) return;
+      // build messages with resolved images from chatLog
+      const messages = chatLog.map(entry => ({
+        role: entry.role,
+        content: entry.content || "",
+        images: entry.images || [],
+        generatedImage: entry.generatedImage || false
+      }));
+      if (format === "html")     await ipcRenderer.invoke("export-html",     { messages, title: chatTitle });
+      if (format === "markdown") await ipcRenderer.invoke("export-markdown", { messages, title: chatTitle });
+      if (format === "pdf")      await ipcRenderer.invoke("export-pdf");
+    });
+
     ipcRenderer.on("save-chat", async () => {
       if (chatLog.length === 0) return;
       const savedMessages = [];
@@ -518,7 +609,7 @@
         }
         savedMessages.push(msg);
       }
-      await ipcRenderer.invoke("save-chat-dialog", { history, messages: savedMessages });
+      await ipcRenderer.invoke("save-chat-dialog", { history, messages: savedMessages, title: chatTitle });
     });
 
     ipcRenderer.on("load-chat-data", async (_event, data) => {
@@ -526,6 +617,11 @@
       chatLog.length = 0;
       chat.innerHTML = "";
       history.push(...data.history);
+      if (data.title) {
+        chatTitle = data.title;
+        chatTitleEl.textContent = data.title;
+        document.title = data.title;
+      }
 
       for (const msg of data.messages) {
         chatLog.push(msg);
@@ -554,6 +650,7 @@
           if (msg.generatedImage && msg.images?.length) {
             const img = document.createElement("img");
             img.src = msg.images[0];
+            img.style.maxWidth = "200px";
             div.appendChild(img);
             div.appendChild(makeImageDownloadAction(msg.images[0], "image"));
           } else {

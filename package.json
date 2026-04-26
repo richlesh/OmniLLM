@@ -1,7 +1,7 @@
 {
   "name": "llm-chatbot",
   "productName": "LLM Chatbot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Chatbot for various LLMs",
   "main": "main.js",
   "scripts": {

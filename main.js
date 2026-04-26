@@ -51,6 +51,7 @@ function showAbout() {
   aboutWin.loadFile("about.html");
   aboutWin.webContents.once("did-finish-load", () => {
     aboutWin.webContents.send("icon-path", path.join(__dirname, "app_icon.png"));
+    aboutWin.webContents.send("app-version", require("./package.json").version);
   });
   ipcMain.handleOnce("close-about", () => aboutWin.close());
 }
@@ -100,6 +101,30 @@ function buildMenu() {
         },
         { type: "separator" },
         {
+          label: "Export",
+          submenu: [
+            {
+              label: "HTML…",
+              click: () => BrowserWindow.getFocusedWindow()?.webContents.send("export-chat", "html")
+            },
+            {
+              label: "Markdown…",
+              click: () => BrowserWindow.getFocusedWindow()?.webContents.send("export-chat", "markdown")
+            },
+            {
+              label: "PDF…",
+              click: () => BrowserWindow.getFocusedWindow()?.webContents.send("export-chat", "pdf")
+            }
+          ]
+        },
+        { type: "separator" },
+        {
+          label: "Print…",
+          accelerator: "CmdOrCtrl+P",
+          click: () => BrowserWindow.getFocusedWindow()?.webContents.print()
+        },
+        { type: "separator" },
+        {
           label: "Close",
           accelerator: "CmdOrCtrl+W",
           click: () => BrowserWindow.getFocusedWindow()?.close()
@@ -127,11 +152,115 @@ function openSettings() {
   settingsWin.on("closed", () => { settingsWin = null; });
 }
 
+ipcMain.handle("export-html", async (_event, { messages, title }) => {
+  const safeName = (title || "chat").replace(/[^a-z0-9\-_ ]/gi, "_");
+  const { filePath } = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow() || mainWin, {
+    title: "Export as HTML",
+    defaultPath: path.join(require("os").homedir(), "Documents", `${safeName}.html`),
+    filters: [{ name: "HTML Files", extensions: ["html"] }]
+  });
+  if (!filePath) return;
+  const folder = path.dirname(filePath);
+  const baseName = path.basename(filePath, ".html");
+  const imagesDirName = `${baseName}_images`;
+  const imagesDir = path.join(folder, imagesDirName);
+  if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir);
+
+  const { marked } = require("marked");
+  let body = "";
+  for (const msg of messages) {
+    const role = msg.role === "user" ? "user" : "assistant";
+    let content = "";
+    if (msg.images?.length) {
+      for (let i = 0; i < msg.images.length; i++) {
+        const src = msg.images[i];
+        const imgName = `${role}-${Date.now()}-${i}.png`;
+        const imgPath = path.join(imagesDir, imgName);
+        if (src.startsWith("data:")) {
+          fs.writeFileSync(imgPath, Buffer.from(src.split(",")[1], "base64"));
+          content += `<img src="${imagesDirName}/${imgName}" style="max-width:200px"><br>`;
+        }
+      }
+    }
+    if (msg.content) {
+      content += role === "user"
+        ? `<p>${msg.content.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>")}</p>`
+        : marked.parse(msg.content);
+    }
+    body += `<div class="msg ${role}">${content}</div>\n`;
+  }
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${title || "Chat Export"}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono+NL:wght@400;700&display=swap">
+<style>
+body{font-family:-apple-system,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;}
+.msg{margin-bottom:16px;padding:10px 14px;border-radius:12px;}
+.user{background:#e8f0fe;text-align:right;}
+.assistant{background:#f5f5f5;}
+.assistant p{margin:0 0 8px;}
+.assistant p:last-child{margin-bottom:0;}
+.assistant pre{background:#e8e8e8;border-radius:8px;padding:12px;overflow-x:auto;margin:8px 0;}
+.assistant code{font-family:'JetBrains Mono NL',monospace;font-size:13px;background:#e8e8e8;padding:1px 4px;border-radius:3px;}
+.assistant pre code{background:none;padding:0;}
+img{border-radius:8px;display:block;margin:6px 0;}
+</style></head><body>${body}</body></html>`;
+  fs.writeFileSync(filePath, html, "utf8");
+});
+
+ipcMain.handle("export-markdown", async (_event, { messages, title }) => {
+  const safeName = (title || "chat").replace(/[^a-z0-9\-_ ]/gi, "_");
+  const { filePath } = await dialog.showSaveDialog(BrowserWindow.getFocusedWindow() || mainWin, {
+    title: "Export as Markdown",
+    defaultPath: path.join(require("os").homedir(), "Documents", `${safeName}.md`),
+    filters: [{ name: "Markdown Files", extensions: ["md"] }]
+  });
+  if (!filePath) return;
+  const folder = path.dirname(filePath);
+  const baseName = path.basename(filePath, ".md");
+  const imagesDirName = `${baseName}_images`;
+  const imagesDir = path.join(folder, imagesDirName);
+  if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir);
+
+  let md = title ? `# ${title}\n\n` : "";
+  for (const msg of messages) {
+    const role = msg.role === "user" ? "**You**" : "**Assistant**";
+    md += `${role}\n\n`;
+    if (msg.images?.length) {
+      for (let i = 0; i < msg.images.length; i++) {
+        const src = msg.images[i];
+        const imgName = `${msg.role}-${Date.now()}-${i}.png`;
+        const imgPath = path.join(imagesDir, imgName);
+        if (src.startsWith("data:")) {
+          fs.writeFileSync(imgPath, Buffer.from(src.split(",")[1], "base64"));
+          md += `![image](${imagesDirName}/${imgName})\n\n`;
+        }
+      }
+    }
+    if (msg.content) md += `${msg.content}\n\n`;
+    md += "---\n\n";
+  }
+  fs.writeFileSync(filePath, md, "utf8");
+});
+
+ipcMain.handle("export-pdf", async (_event, dummy, win) => {
+  const focusedWin = BrowserWindow.getFocusedWindow() || mainWin;
+  const { filePath } = await dialog.showSaveDialog(focusedWin, {
+    title: "Export as PDF",
+    defaultPath: path.join(require("os").homedir(), "Documents", "chat.pdf"),
+    filters: [{ name: "PDF Files", extensions: ["pdf"] }]
+  });
+  if (!filePath) return;
+  const data = await focusedWin.webContents.printToPDF({ printBackground: false });
+  fs.writeFileSync(filePath, data);
+});
+
 ipcMain.handle("save-chat-dialog", async (_event, data) => {
   const win = BrowserWindow.getFocusedWindow() || mainWin;
+  const safeName = (data.title || "chat").replace(/[^a-z0-9\-_ ]/gi, "_");
   const { filePath } = await dialog.showSaveDialog(win, {
     title: "Save Chat",
-    defaultPath: path.join(require("os").homedir(), "Documents", "chat.json"),
+    defaultPath: path.join(require("os").homedir(), "Documents", `${safeName}.json`),
     filters: [{ name: "Chat Files", extensions: ["json"] }]
   });
   if (!filePath) return false;
@@ -140,18 +269,12 @@ ipcMain.handle("save-chat-dialog", async (_event, data) => {
 });
 
 async function fetchModels(vendor, apiKey) {
-  const baseURLs = {
-    alibaba:  "https://dashscope-us.aliyuncs.com/compatible-mode/v1",
-    deepseek: "https://api.deepseek.com",
-    meta:     "https://api.llama.com/compat/v1",
-    google:   "https://generativelanguage.googleapis.com/v1beta/openai"
-  };
   if (vendor === "anthropic") {
     const client = new Anthropic({ apiKey });
     const res = await client.models.list();
     return res.data.map(m => m.id).sort();
   }
-  const client = new OpenAI({ apiKey, baseURL: baseURLs[vendor] });
+  const client = new OpenAI({ apiKey, baseURL: VENDORS[vendor]?.baseURL });
   const res = await client.models.list();
   return res.data.map(m => m.id).sort();
 }
@@ -205,15 +328,7 @@ ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model:
     return res.content[0].text;
   }
 
-  const baseURLs = {
-    alibaba:  "https://dashscope-us.aliyuncs.com/compatible-mode/v1",
-    deepseek: "https://api.deepseek.com",
-    meta:     "https://api.llama.com/compat/v1",
-    google:   "https://generativelanguage.googleapis.com/v1beta/openai"
-  };
-  const baseURL = baseURLs[vendor];
-
-  const client = new OpenAI({ apiKey, baseURL });
+  const client = new OpenAI({ apiKey, baseURL: VENDORS[vendor]?.baseURL });
   const res = await client.chat.completions.create({ model, messages });
   return res.choices[0].message.content;
 });
@@ -252,8 +367,7 @@ ipcMain.handle("chat-with-image", async (_event, { tempPath, mediaType, text, ve
     return res.content[0].text;
   }
 
-  const baseURLs = { alibaba: "https://dashscope-us.aliyuncs.com/compatible-mode/v1", deepseek: "https://api.deepseek.com", meta: "https://api.llama.com/compat/v1", google: "https://generativelanguage.googleapis.com/v1beta/openai" };
-  const client = new OpenAI({ apiKey, baseURL: baseURLs[vendor] });
+  const client = new OpenAI({ apiKey, baseURL: VENDORS[vendor]?.baseURL });
   const res = await client.chat.completions.create({
     model,
     messages: [{ role: "user", content: [
@@ -280,10 +394,14 @@ ipcMain.handle("generate-image", async (_event, { promptText, vendor }) => {
     return `data:image/png;base64,${b64}`;
   }
 
-  // OpenAI DALL-E
+  // OpenAI DALL-E - fetch and convert to base64 immediately so URL doesn't expire
   const client = new OpenAI({ apiKey: apiKeys.openai });
   const res = await client.images.generate({ model: "dall-e-3", prompt: promptText, n: 1, size: "1024x1024" });
-  return res.data[0].url;
+  const imageUrl = res.data[0].url;
+  const response = await fetch(imageUrl);
+  const arrayBuffer = await response.arrayBuffer();
+  const b64 = Buffer.from(arrayBuffer).toString("base64");
+  return `data:image/png;base64,${b64}`;
 });
 
 ipcMain.handle("download-image", async (_event, { url, promptText }) => {

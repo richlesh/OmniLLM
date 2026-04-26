@@ -46,8 +46,8 @@
   <img id="icon">
   <h1>LLM Chatbot</h1>
   <p>
-    Version 1.0<br>
-    by Richard Lesh<br>
+    Version <span id="app-version"></span><br>
+    ©2026 Richard Lesh<br>
     Built with Electron v<span id="electron-version"></span><br>
     <a id="website" href="#">https://github.com/richlesh/LLM-Chatbot</a>
   </p>
@@ -60,6 +60,10 @@
 
     ipcRenderer.on("icon-path", (_e, iconPath) => {
       document.getElementById("icon").src = iconPath;
+    });
+
+    ipcRenderer.on("app-version", (_e, version) => {
+      document.getElementById("app-version").textContent = version;
     });
 
     document.getElementById("website").addEventListener("click", e => {

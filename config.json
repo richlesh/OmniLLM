@@ -16,24 +16,28 @@
       "label": "Alibaba",
       "models": ["qwen-max", "qwen-plus", "qwen-turbo"],
       "apiKeyUrl": "https://www.alibabacloud.com/help/en/model-studio/get-api-key",
+      "baseURL": "https://dashscope-us.aliyuncs.com/compatible-mode/v1",
       "imageGeneration": false
     },
     "deepseek": {
       "label": "DeepSeek",
       "models": ["deepseek-chat", "deepseek-reasoner"],
       "apiKeyUrl": "https://platform.deepseek.com/api_keys",
+      "baseURL": "https://api.deepseek.com",
       "imageGeneration": false
     },
     "meta": {
       "label": "Meta",
       "models": ["meta-llama/Llama-3.3-70B-Instruct", "meta-llama/Llama-3.1-8B-Instruct"],
       "apiKeyUrl": "https://llama.developer.meta.com/docs/api-keys",
+      "baseURL": "https://api.llama.com/compat/v1",
       "imageGeneration": false
     },
     "google": {
       "label": "Google",
       "models": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash"],
       "apiKeyUrl": "https://aistudio.google.com/apikey",
+      "baseURL": "https://generativelanguage.googleapis.com/v1beta/openai",
       "imageGeneration": true
     }
   }

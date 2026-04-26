@@ -190,37 +190,93 @@
       flex-shrink: 0;
       transition: background 0.2s;
     }
-    #title-bar {
+    #tab-bar {
+      display: flex;
+      align-items: stretch;
+      background: #1a1a1a;
+      border-bottom: 1px solid #333;
+      min-height: 36px;
+      -webkit-app-region: drag;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }
+    #tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 6px 16px;
+      gap: 6px;
+      padding: 0 10px 0 14px;
+      min-width: 100px;
+      max-width: 200px;
       background: #252525;
-      border-bottom: 1px solid #333;
-      min-height: 34px;
-      -webkit-app-region: drag;
-    }
-    #chat-title {
-      font-size: 13px;
-      color: #aaa;
+      border-right: 1px solid #333;
       cursor: pointer;
-      padding: 2px 8px;
-      border-radius: 6px;
+      font-size: 12px;
+      color: #888;
+      white-space: nowrap;
+      overflow: hidden;
       -webkit-app-region: no-drag;
+      flex-shrink: 0;
+      position: relative;
+      user-select: none;
     }
-    #chat-title:hover { background: #3a3a3c; color: #e0e0e0; }
-    #title-input {
-      font-size: 13px;
+    .tab:hover { background: #2e2e2e; color: #ccc; }
+    .tab.active { background: #1e1e1e; color: #e0e0e0; border-bottom: 2px solid #0a84ff; }
+    .tab.drag-over { background: #0a84ff33; }
+
+    .tab-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tab-title-input {
+      flex: 1;
+      font-size: 12px;
       background: #3a3a3c;
       color: #e0e0e0;
       border: 1px solid #0a84ff;
-      border-radius: 6px;
-      padding: 2px 8px;
+      border-radius: 4px;
+      padding: 1px 6px;
       outline: none;
-      width: 300px;
       display: none;
+      min-width: 0;
+    }
+    .tab-close {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: none;
+      background: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
       -webkit-app-region: no-drag;
     }
+    .tab-close:hover { background: #ff453a33; color: #ff453a; }
+    .tab.unsaved .tab-title::after { content: " •"; color: #0a84ff; }
+
+    #new-tab-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 18px;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+    }
+    #new-tab-btn:hover { color: #e0e0e0; background: #2e2e2e; }
 
     #send-btn:hover    { background: #0070d8; }
     #send-btn:disabled { background: #444; cursor: default; }
@@ -228,9 +284,9 @@
   </style>
 </head>
 <body>
-  <div id="title-bar">
-    <span id="chat-title" title="Double-click to rename">New Chat</span>
-    <input id="title-input" type="text" maxlength="80">
+  <div id="tab-bar">
+    <!-- tabs injected here -->
+    <button id="new-tab-btn" title="New Tab">+</button>
   </div>
   <div id="chat"></div>
 
@@ -248,7 +304,7 @@
         <polyline points="21 15 16 10 5 21"/>
       </svg>
     </button>
-    <button class="icon-btn" id="imagine-btn" title="Generate image with DALL-E">
+    <button class="icon-btn" id="imagine-btn" title="Generate Image">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
       </svg>
@@ -280,46 +336,278 @@
       })()
     });
 
-    const chat        = document.getElementById("chat");
-    const prompt      = document.getElementById("prompt");
-    const sendBtn     = document.getElementById("send-btn");
-    const attachBtn   = document.getElementById("attach-btn");
-    const imagineBtn  = document.getElementById("imagine-btn");
-    const fileInput   = document.getElementById("file-input");
-    const previewWrap = document.getElementById("image-preview-wrap");
-    const previewImg  = document.getElementById("image-preview");
-    const clearBtn    = document.getElementById("image-clear-btn");
-    const vendorSel   = document.getElementById("vendor-select");
-    const modelSel    = document.getElementById("model-select");
-    const chatTitleEl = document.getElementById("chat-title");
-    const titleInput  = document.getElementById("title-input");
+    const chatEl       = document.getElementById("chat");
+    const prompt       = document.getElementById("prompt");
+    const sendBtn      = document.getElementById("send-btn");
+    const attachBtn    = document.getElementById("attach-btn");
+    const imagineBtn   = document.getElementById("imagine-btn");
+    const fileInput    = document.getElementById("file-input");
+    const previewWrap  = document.getElementById("image-preview-wrap");
+    const previewImg   = document.getElementById("image-preview");
+    const clearBtn     = document.getElementById("image-clear-btn");
+    const vendorSel    = document.getElementById("vendor-select");
+    const modelSel     = document.getElementById("model-select");
+    const tabBar       = document.getElementById("tab-bar");
+    const newTabBtn    = document.getElementById("new-tab-btn");
 
-    let chatTitle = "New Chat";
+    // ── Tab state ──────────────────────────────────────────────────────────────
+    let tabIdCounter = 0;
+    let activeTabId  = null;
+    const tabs = {};   // id → { id, title, history, chatLog, saved, imagineMode, attachedImage, domEl, chatSnapshot }
 
-    chatTitleEl.addEventListener("dblclick", () => {
-      titleInput.value = chatTitle;
-      chatTitleEl.style.display = "none";
-      titleInput.style.display = "inline-block";
-      titleInput.focus();
-      titleInput.select();
-    });
+    function createTab(title = "New Chat", restore = null) {
+      const id = ++tabIdCounter;
 
-    function commitTitle() {
-      const val = titleInput.value.trim();
-      if (val) { chatTitle = val; chatTitleEl.textContent = val; document.title = val; }
-      titleInput.style.display = "none";
-      chatTitleEl.style.display = "";
+      // each tab owns a persistent container div
+      const container = document.createElement("div");
+      container.style.cssText = "display:flex;flex-direction:column;gap:10px;width:100%;";
+
+      const tab = {
+        id,
+        title: title,
+        history: restore ? restore.history : [],
+        chatLog: restore ? restore.chatLog : [],
+        saved: restore ? true : false,
+        imagineMode: false,
+        attachedImage: null,
+        vendor: restore ? restore.vendor : null,
+        model: restore ? restore.model : null,
+        domEl: null,
+        container   // persistent chat container
+      };
+      tabs[id] = tab;
+
+      // build tab DOM element
+      const el = document.createElement("div");
+      el.className = "tab";
+      el.dataset.tabId = id;
+      el.draggable = true;
+
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "tab-title";
+      titleSpan.textContent = title;
+
+      const titleInput = document.createElement("input");
+      titleInput.className = "tab-title-input";
+      titleInput.maxLength = 80;
+      titleInput.type = "text";
+
+      const closeBtn = document.createElement("button");
+      closeBtn.className = "tab-close";
+      closeBtn.title = "Close tab";
+      closeBtn.textContent = "×";
+      closeBtn.addEventListener("click", e => { e.stopPropagation(); closeTab(id); });
+
+      el.append(titleSpan, titleInput, closeBtn);
+      el.addEventListener("click", () => switchTab(id));
+
+      // rename on double-click
+      titleSpan.addEventListener("dblclick", e => {
+        e.stopPropagation();
+        titleInput.value = tab.title;
+        titleSpan.style.display = "none";
+        titleInput.style.display = "block";
+        titleInput.focus();
+        titleInput.select();
+      });
+      titleInput.addEventListener("keydown", e => {
+        if (e.key === "Enter") commitTabTitle(id);
+        if (e.key === "Escape") { titleInput.style.display = "none"; titleSpan.style.display = ""; }
+      });
+      titleInput.addEventListener("blur", () => commitTabTitle(id));
+
+      // drag-and-drop
+      el.addEventListener("dragstart", e => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", id);
+        ipcRenderer.send("tab-drag-start", { tabId: id, state: serializeTab(id) });
+      });
+      el.addEventListener("dragend", () => {
+        ipcRenderer.send("tab-drag-end", { tabId: id });
+      });
+
+      tab.domEl = el;
+      // insert before the + button
+      tabBar.insertBefore(el, newTabBtn);
+
+      if (restore) {
+        // rebuild chat HTML from chatLog into the tab's container
+        container.innerHTML = buildChatHtml(restore.chatLog);
+      }
+
+      switchTab(id);
+      return id;
     }
 
-    titleInput.addEventListener("keydown", e => {
-      if (e.key === "Enter") commitTitle();
-      if (e.key === "Escape") { titleInput.style.display = "none"; chatTitleEl.style.display = ""; }
-    });
-    titleInput.addEventListener("blur", commitTitle);
+    function commitTabTitle(id) {
+      const tab = tabs[id];
+      if (!tab) return;
+      const titleInput = tab.domEl.querySelector(".tab-title-input");
+      const titleSpan  = tab.domEl.querySelector(".tab-title");
+      const val = titleInput.value.trim();
+      if (val) {
+        tab.title = val;
+        titleSpan.textContent = val;
+        if (id === activeTabId) document.title = "LLM Chatbot";
+      }
+      titleInput.style.display = "none";
+      titleSpan.style.display = "";
+    }
 
-    // populate vendor/model from config + saved settings
+    function markUnsaved(id) {
+      const tab = tabs[id];
+      if (!tab || tab.saved === false) return;
+      tab.saved = false;
+      tab.domEl.classList.add("unsaved");
+    }
+
+    function markSaved(id) {
+      const tab = tabs[id];
+      if (!tab) return;
+      tab.saved = true;
+      tab.domEl.classList.remove("unsaved");
+    }
+
+    function switchTab(id) {
+      if (activeTabId === id) return;
+
+      // save vendor/model of outgoing tab
+      if (activeTabId && tabs[activeTabId]) {
+        tabs[activeTabId].vendor = vendorSel.value;
+        tabs[activeTabId].model  = modelSel.value;
+        tabs[activeTabId].domEl.classList.remove("active");
+        // detach outgoing container
+        if (chatEl.contains(tabs[activeTabId].container)) {
+          chatEl.removeChild(tabs[activeTabId].container);
+        }
+      }
+
+      activeTabId = id;
+      const tab = tabs[id];
+      tab.domEl.classList.add("active");
+      document.title = "LLM Chatbot";
+
+      // attach this tab's container
+      chatEl.appendChild(tab.container);
+      chatEl.scrollTop = chatEl.scrollHeight;
+
+      // re-wire code copy buttons
+      tab.container.querySelectorAll("pre").forEach(pre => {
+        const copyBtn = pre.querySelector(".code-copy-btn");
+        if (!copyBtn) return;
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(pre.querySelector("code").innerText);
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => copyBtn.textContent = "Copy", 1500);
+        };
+      });
+
+      // sync imagine mode UI
+      imagineBtn.classList.toggle("active", tab.imagineMode);
+      prompt.placeholder = tab.imagineMode ? "Describe an image to generate…" : "Message…";
+
+      // repopulate vendor list filtered by this tab's imagineMode, then restore vendor/model
+      const targetVendor = tab.vendor || vendorSel.value;
+      populateVendorSelectOnly(allVendors, targetVendor, tab.imagineMode);
+      fetchAndPopulateModels(vendorSel.value, tab.model || null).then(() => {
+        modelSel.style.display = tab.imagineMode ? "none" : "";
+      });
+
+      clearImage();
+      prompt.focus();
+    }
+
+    function activeTab() { return tabs[activeTabId]; }
+
+    async function closeTab(id) {
+      const tab = tabs[id];
+      if (!tab) return;
+
+      if (!tab.saved && tab.chatLog.length > 0) {
+        const { response } = await ipcRenderer.invoke("confirm-close-tab", { title: tab.title });
+        if (response === 0) {
+          // Save first
+          const saved = await saveTab(id);
+          if (!saved) return; // user cancelled save dialog
+        } else if (response === 2) {
+          return; // Cancel
+        }
+        // response === 1 → close without saving
+      }
+
+      const tabIds = Object.keys(tabs).map(Number);
+      const idx = tabIds.indexOf(id);
+
+      tab.domEl.remove();
+      delete tabs[id];
+
+      const remaining = Object.keys(tabs).map(Number);
+      if (remaining.length === 0) {
+        // no tabs left — create a fresh one
+        createTab();
+      } else if (activeTabId === id) {
+        // switch to adjacent tab
+        const nextId = remaining[Math.min(idx, remaining.length - 1)];
+        activeTabId = null;
+        switchTab(nextId);
+      }
+    }
+
+    function serializeTab(id) {
+      const tab = tabs[id];
+      if (!tab) return null;
+      const vendor = (id === activeTabId) ? vendorSel.value : tab.vendor;
+      const model  = (id === activeTabId) ? modelSel.value  : tab.model;
+      return { title: tab.title, history: tab.history, chatLog: tab.chatLog, vendor, model };
+    }
+
+    function buildChatHtml(chatLog) {
+      // Rebuild chat HTML from a saved chatLog (used when restoring a dragged-in tab)
+      const tmp = document.createElement("div");
+      for (const msg of chatLog) {
+        if (msg.role === "user") {
+          if (msg.images?.length) {
+            const div = document.createElement("div");
+            div.className = "msg user";
+            for (const src of msg.images) {
+              const img = document.createElement("img");
+              img.src = src; img.style.maxWidth = "200px";
+              div.appendChild(img);
+            }
+            if (msg.content) {
+              const p = document.createElement("div");
+              p.textContent = msg.content; p.style.marginTop = "6px";
+              div.appendChild(p);
+            }
+            tmp.appendChild(div);
+          } else {
+            const div = document.createElement("div");
+            div.className = "msg user";
+            div.textContent = msg.content;
+            tmp.appendChild(div);
+          }
+        } else {
+          const div = document.createElement("div");
+          div.className = "msg assistant";
+          if (msg.generatedImage && msg.images?.length) {
+            const img = document.createElement("img");
+            img.src = msg.images[0]; img.style.maxWidth = "200px";
+            div.appendChild(img);
+            div.appendChild(makeImageDownloadAction(msg.images[0], "image"));
+          } else {
+            div.innerHTML = marked.parse(msg.content || "");
+            addCodeCopyButtons(div);
+            div.appendChild(makeActions(msg.content || ""));
+          }
+          tmp.appendChild(div);
+        }
+      }
+      return tmp.innerHTML;
+    }
+
+    // ── Vendor / model ─────────────────────────────────────────────────────────
     let allVendors = {};
-    const rememberedModel = {}; // per-vendor remembered model
+    const rememberedModel = {};
 
     ipcRenderer.invoke("get-vendors-and-settings").then(({ vendors, settings }) => {
       allVendors = vendors;
@@ -329,68 +617,62 @@
       vendorSel.addEventListener("change", () => {
         rememberedModel[vendorSel.dataset.prev] = modelSel.value;
         vendorSel.dataset.prev = vendorSel.value;
-        populateVendorSelect(allVendors, vendorSel.value, imagineMode);
+        const tab = activeTab();
+        populateVendorSelect(allVendors, vendorSel.value, tab ? tab.imagineMode : false);
       });
+
+      // create the first tab after vendors are loaded
+      createTab();
     });
 
-    function populateVendorSelect(vendors, selectedVendor, imagineOnly) {
-      const current = vendorSel.value || selectedVendor;
+    function populateVendorSelectOnly(vendors, selectedVendor, imagineOnly) {
+      const current = selectedVendor || vendorSel.value;
       vendorSel.innerHTML = "";
       for (const [key, v] of Object.entries(vendors)) {
         if (imagineOnly && !v.imageGeneration) continue;
         const opt = document.createElement("option");
-        opt.value = key;
-        opt.textContent = v.label;
+        opt.value = key; opt.textContent = v.label;
         vendorSel.appendChild(opt);
       }
       vendorSel.value = current;
       if (!vendorSel.value) vendorSel.selectedIndex = 0;
       vendorSel.dataset.prev = vendorSel.value;
+    }
+
+    function populateVendorSelect(vendors, selectedVendor, imagineOnly) {
+      populateVendorSelectOnly(vendors, selectedVendor, imagineOnly);
       fetchAndPopulateModels(vendorSel.value);
     }
 
-    async function fetchAndPopulateModels(vendor) {
-      modelSel.innerHTML = "<option disabled>Loading\u2026</option>";
-      const models = await ipcRenderer.invoke("get-models-for-vendor", vendor);
+    const modelCache = {};  // vendor → models array
+
+    async function fetchAndPopulateModels(vendor, targetModel = null) {
+      if (!modelCache[vendor]) {
+        modelSel.innerHTML = "<option disabled>Loading\u2026</option>";
+        modelCache[vendor] = await ipcRenderer.invoke("get-models-for-vendor", vendor);
+      }
+      const models = modelCache[vendor];
       modelSel.innerHTML = "";
       if (!models || models.length === 0) {
         const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "API Key Not Set";
-        opt.disabled = true;
+        opt.value = ""; opt.textContent = "API Key Not Set"; opt.disabled = true;
         modelSel.appendChild(opt);
       } else {
         for (const m of models) {
           const opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m;
+          opt.value = m; opt.textContent = m;
           modelSel.appendChild(opt);
         }
-        // restore remembered model if available
-        if (rememberedModel[vendor] && models.includes(rememberedModel[vendor])) {
-          modelSel.value = rememberedModel[vendor];
+        const restore = targetModel || rememberedModel[vendor];
+        if (restore && models.includes(restore)) {
+          modelSel.value = restore;
         }
       }
     }
 
-    // save model selection when user changes it manually
-    modelSel.addEventListener("change", () => {
-      rememberedModel[vendorSel.value] = modelSel.value;
-    });
+    modelSel.addEventListener("change", () => { rememberedModel[vendorSel.value] = modelSel.value; });
 
-    // right-click context menu on any image in the chat
-    chat.addEventListener("contextmenu", e => {
-      if (e.target.tagName !== "IMG") return;
-      e.preventDefault();
-      ipcRenderer.invoke("image-context-menu", e.target.src);
-    });
-
-    const history = [];  // LLM API history (text only)
-    const chatLog = [];  // full UI log including generated images
-    let attachedImage = null;
-    let imagineMode = false;
-
-    // --- image attach ---
+    // ── Image attach ───────────────────────────────────────────────────────────
     attachBtn.addEventListener("click", () => fileInput.click());
 
     fileInput.addEventListener("change", () => {
@@ -400,7 +682,8 @@
       reader.onload = e => {
         const dataUrl = e.target.result;
         const base64 = dataUrl.split(",")[1];
-        attachedImage = { base64, mediaType: file.type, dataUrl };
+        const tab = activeTab();
+        if (tab) tab.attachedImage = { base64, mediaType: file.type, dataUrl };
         previewImg.src = dataUrl;
         previewWrap.style.display = "flex";
       };
@@ -410,22 +693,48 @@
 
     clearBtn.addEventListener("click", clearImage);
     function clearImage() {
-      attachedImage = null;
+      const tab = activeTab();
+      if (tab) tab.attachedImage = null;
       previewWrap.style.display = "none";
       previewImg.src = "";
     }
 
-    // --- imagine mode toggle ---
-    imagineBtn.addEventListener("click", () => {
-      imagineMode = !imagineMode;
-      imagineBtn.classList.toggle("active", imagineMode);
-      prompt.placeholder = imagineMode ? "Describe an image to generate…" : "Message…";
-      populateVendorSelect(allVendors, vendorSel.value, imagineMode);
-      modelSel.style.display = imagineMode ? "none" : "";
+    // right-click context menu on any image in the chat
+    chatEl.addEventListener("contextmenu", e => {
+      if (e.target.tagName !== "IMG") return;
+      e.preventDefault();
+      ipcRenderer.invoke("image-context-menu", e.target.src);
     });
 
-    // --- send ---
+    // ── Imagine mode toggle ────────────────────────────────────────────────────
+    imagineBtn.addEventListener("click", () => {
+      const tab = activeTab();
+      if (!tab) return;
+      tab.imagineMode = !tab.imagineMode;
+      imagineBtn.classList.toggle("active", tab.imagineMode);
+      prompt.placeholder = tab.imagineMode ? "Describe an image to generate…" : "Message…";
+      populateVendorSelect(allVendors, vendorSel.value, tab.imagineMode);
+      modelSel.style.display = tab.imagineMode ? "none" : "";
+    });
+
+    // ── New tab button ─────────────────────────────────────────────────────────
+    newTabBtn.addEventListener("click", () => createTab());
+
+    // ── Tab bar drop target (receive dragged tab from another window) ──────────
+    tabBar.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    });
+    tabBar.addEventListener("drop", e => {
+      e.preventDefault();
+      const sourceTabId = e.dataTransfer.getData("text/plain");
+      ipcRenderer.send("tab-drop-here", { sourceTabId });
+    });
+
+    // ── Send ───────────────────────────────────────────────────────────────────
     async function send() {
+      const tab = activeTab();
+      if (!tab) return;
       const text = prompt.value.trim();
       if (!text) return;
 
@@ -433,91 +742,96 @@
       prompt.style.height = "auto";
       sendBtn.disabled = true;
 
-      if (imagineMode) {
-        addMessage("user", `🎨 ${text}`);
-        chatLog.push({ role: "user", content: `🎨 ${text}`, images: [] });
-        const thinking = addMessage("assistant", "…");
+      // capture these now — user may switch tabs before the await resolves
+      const tabId  = tab.id;
+      const vendor = vendorSel.value;
+      const model  = modelSel.value;
+
+      if (tab.imagineMode) {
+        addMessage("user", `🎨 ${text}`, tabId);
+        tab.chatLog.push({ role: "user", content: `🎨 ${text}`, images: [] });
+        markUnsaved(tabId);
+        const thinking = addMessage("assistant", "…", tabId);
         try {
-          const url = await ipcRenderer.invoke("generate-image", { promptText: text, vendor: vendorSel.value });
+          const url = await ipcRenderer.invoke("generate-image", { promptText: text, vendor });
           thinking.innerHTML = "";
           const img = document.createElement("img");
-          img.src = url;
-          img.style.maxWidth = "200px";
+          img.src = url; img.style.maxWidth = "200px";
           thinking.appendChild(img);
           thinking.appendChild(makeImageDownloadAction(url, text));
-          chatLog.push({ role: "assistant", content: "", generatedImageUrl: url });
+          tab.chatLog.push({ role: "assistant", content: "", generatedImageUrl: url });
         } catch (err) {
           thinking.className = "msg error";
           thinking.textContent = "Error: " + err.message;
-          chatLog.pop();
+          tab.chatLog.pop();
         }
-      } else if (attachedImage) {
-        const image = attachedImage;
+      } else if (tab.attachedImage) {
+        const image = tab.attachedImage;
         const dataUrl = image.dataUrl;
         clearImage();
 
         const userDiv = document.createElement("div");
         userDiv.className = "msg user";
         const imgEl = document.createElement("img");
-        imgEl.src = dataUrl;
-        imgEl.style.maxWidth = "200px";
+        imgEl.src = dataUrl; imgEl.style.maxWidth = "200px";
         userDiv.appendChild(imgEl);
         if (text) {
           const p = document.createElement("div");
-          p.textContent = text;
-          p.style.marginTop = "6px";
+          p.textContent = text; p.style.marginTop = "6px";
           userDiv.appendChild(p);
         }
-        chat.appendChild(userDiv);
-        chat.scrollTop = chat.scrollHeight;
-        chatLog.push({ role: "user", content: text || "", images: [dataUrl] });
+        tab.container.appendChild(userDiv);
+        if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
+        tab.chatLog.push({ role: "user", content: text || "", images: [dataUrl] });
+        markUnsaved(tabId);
 
-        const thinking = addMessage("assistant", "…");
+        const thinking = addMessage("assistant", "…", tabId);
         try {
-          // write image to temp file to avoid IPC size limits
           const tempPath = await ipcRenderer.invoke("save-temp-image", { base64: image.base64, mediaType: image.mediaType });
-          const reply = await ipcRenderer.invoke("chat-with-image", { tempPath, mediaType: image.mediaType, text, vendor: vendorSel.value, model: modelSel.value });
+          const reply = await ipcRenderer.invoke("chat-with-image", { tempPath, mediaType: image.mediaType, text, vendor, model });
           thinking.innerHTML = marked.parse(reply);
           addCodeCopyButtons(thinking);
           thinking.appendChild(makeActions(reply));
-          history.push({ role: "user", content: text || "What is in this image?" });
-          history.push({ role: "assistant", content: reply });
-          chatLog.push({ role: "assistant", content: reply, images: [] });
+          tab.history.push({ role: "user", content: text || "What is in this image?" });
+          tab.history.push({ role: "assistant", content: reply });
+          tab.chatLog.push({ role: "assistant", content: reply, images: [] });
         } catch (err) {
           thinking.className = "msg error";
           thinking.textContent = "Error: " + err.message;
-          chatLog.pop();
+          tab.chatLog.pop();
         }
       } else {
-        addMessage("user", text);
-        history.push({ role: "user", content: text });
-        chatLog.push({ role: "user", content: text, images: [] });
-        const thinking = addMessage("assistant", "…");
+        addMessage("user", text, tabId);
+        tab.history.push({ role: "user", content: text });
+        tab.chatLog.push({ role: "user", content: text, images: [] });
+        markUnsaved(tabId);
+        const thinking = addMessage("assistant", "…", tabId);
         try {
-          const reply = await ipcRenderer.invoke("chat", { messages: history, vendor: vendorSel.value, model: modelSel.value });
+          const reply = await ipcRenderer.invoke("chat", { messages: tab.history, vendor, model });
           thinking.innerHTML = marked.parse(reply);
           addCodeCopyButtons(thinking);
           thinking.appendChild(makeActions(reply));
-          history.push({ role: "assistant", content: reply });
-          chatLog.push({ role: "assistant", content: reply, images: [] });
+          tab.history.push({ role: "assistant", content: reply });
+          tab.chatLog.push({ role: "assistant", content: reply, images: [] });
         } catch (err) {
           thinking.className = "msg error";
           thinking.textContent = "Error: " + err.message;
-          chatLog.pop();
+          tab.chatLog.pop();
         }
       }
 
-      chat.scrollTop = chat.scrollHeight;
+      if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
       sendBtn.disabled = false;
       prompt.focus();
     }
 
-    function addMessage(role, text) {
+    function addMessage(role, text, tabId = activeTabId) {
+      const tab = tabs[tabId];
       const div = document.createElement("div");
       div.className = `msg ${role}`;
       div.textContent = text;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
+      tab.container.appendChild(div);
+      if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
       return div;
     }
 
@@ -575,94 +889,108 @@
       });
     }
 
-    // --- file menu actions ---
-    ipcRenderer.on("export-chat", async (_event, format) => {
-      if (chatLog.length === 0) return;
-      // build messages with resolved images from chatLog
-      const messages = chatLog.map(entry => ({
-        role: entry.role,
-        content: entry.content || "",
-        images: entry.images || [],
-        generatedImage: entry.generatedImage || false
-      }));
-      if (format === "html")     await ipcRenderer.invoke("export-html",     { messages, title: chatTitle });
-      if (format === "markdown") await ipcRenderer.invoke("export-markdown", { messages, title: chatTitle });
-      if (format === "pdf")      await ipcRenderer.invoke("export-pdf");
-    });
-
-    ipcRenderer.on("save-chat", async () => {
-      if (chatLog.length === 0) return;
+    // ── Save helper ────────────────────────────────────────────────────────────
+    async function saveTab(id) {
+      const tab = tabs[id];
+      if (!tab || tab.chatLog.length === 0) return true;
       const savedMessages = [];
-      for (const entry of chatLog) {
+      for (const entry of tab.chatLog) {
         const msg = { role: entry.role, content: entry.content, images: [] };
         if (entry.generatedImageUrl) {
-          // fetch remote DALL-E URL and convert to base64
           try {
             const res = await fetch(entry.generatedImageUrl);
             const blob = await res.blob();
             const dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = e => r(e.target.result); fr.readAsDataURL(blob); });
-            msg.images.push(dataUrl);
-            msg.generatedImage = true;
+            msg.images.push(dataUrl); msg.generatedImage = true;
           } catch { msg.images.push(entry.generatedImageUrl); msg.generatedImage = true; }
         } else {
           msg.images = entry.images || [];
         }
         savedMessages.push(msg);
       }
-      await ipcRenderer.invoke("save-chat-dialog", { history, messages: savedMessages, title: chatTitle });
+      const ok = await ipcRenderer.invoke("save-chat-dialog", { history: tab.history, messages: savedMessages, title: tab.title });
+      if (ok) markSaved(id);
+      return ok;
+    }
+
+    // ── File menu IPC ──────────────────────────────────────────────────────────
+    ipcRenderer.on("new-tab", () => createTab());
+
+    ipcRenderer.on("close-tab", () => { if (activeTabId) closeTab(activeTabId); });
+
+    ipcRenderer.on("export-chat", async (_event, format) => {
+      const tab = activeTab();
+      if (!tab || tab.chatLog.length === 0) return;
+      const messages = tab.chatLog.map(entry => ({
+        role: entry.role, content: entry.content || "",
+        images: entry.images || [], generatedImage: entry.generatedImage || false
+      }));
+      if (format === "html")     await ipcRenderer.invoke("export-html",     { messages, title: tab.title });
+      if (format === "markdown") await ipcRenderer.invoke("export-markdown", { messages, title: tab.title });
+      if (format === "pdf")      await ipcRenderer.invoke("export-pdf");
+    });
+
+    ipcRenderer.on("save-chat", async () => {
+      if (activeTabId) await saveTab(activeTabId);
     });
 
     ipcRenderer.on("load-chat-data", async (_event, data) => {
-      history.length = 0;
-      chatLog.length = 0;
-      chat.innerHTML = "";
-      history.push(...data.history);
+      // load into a new tab
+      const id = createTab(data.title || "New Chat", data);
+      const tab = tabs[id];
       if (data.title) {
-        chatTitle = data.title;
-        chatTitleEl.textContent = data.title;
-        document.title = data.title;
+        tab.title = data.title;
+        tab.domEl.querySelector(".tab-title").textContent = data.title;
+        document.title = "LLM Chatbot";
       }
-
-      for (const msg of data.messages) {
-        chatLog.push(msg);
-        if (msg.role === "user") {
-          if (msg.images?.length) {
-            const div = document.createElement("div");
-            div.className = "msg user";
-            for (const src of msg.images) {
-              const img = document.createElement("img");
-              img.src = src;
-              img.style.maxWidth = "200px";
-              div.appendChild(img);
-            }
-            if (msg.content) {
-              const p = document.createElement("div");
-              p.textContent = msg.content;
-              p.style.marginTop = "6px";
-              div.appendChild(p);
-            }
-            chat.appendChild(div);
-          } else {
-            addMessage("user", msg.content);
-          }
-        } else if (msg.role === "assistant") {
-          const div = addMessage("assistant", "");
-          if (msg.generatedImage && msg.images?.length) {
-            const img = document.createElement("img");
-            img.src = msg.images[0];
-            img.style.maxWidth = "200px";
-            div.appendChild(img);
-            div.appendChild(makeImageDownloadAction(msg.images[0], "image"));
-          } else {
-            div.innerHTML = marked.parse(msg.content || "");
-            addCodeCopyButtons(div);
-            div.appendChild(makeActions(msg.content || ""));
-          }
-        }
-      }
-      chat.scrollTop = chat.scrollHeight;
+      markSaved(id);
     });
 
+    // ── Window close check ─────────────────────────────────────────────────────
+    ipcRenderer.on("check-unsaved-before-close", async () => {
+      const unsavedTabs = Object.values(tabs).filter(t => !t.saved && t.chatLog.length > 0);
+      if (unsavedTabs.length === 0) {
+        ipcRenderer.send("close-confirmed");
+        return;
+      }
+      const names = unsavedTabs.map(t => `"${t.title}"`).join(", ");
+      const { response } = await ipcRenderer.invoke("confirm-close-window", { names });
+      if (response === 0) {
+        // save all unsaved tabs
+        for (const t of unsavedTabs) {
+          const ok = await saveTab(t.id);
+          if (!ok) return; // user cancelled a save dialog — abort close
+        }
+        ipcRenderer.send("close-confirmed");
+      } else if (response === 1) {
+        ipcRenderer.send("close-confirmed"); // close without saving
+      }
+      // response === 2 → cancel, do nothing
+    });
+
+    // ── Drag-and-drop IPC (receive tab from another window) ───────────────────
+    ipcRenderer.on("receive-tab", (_event, state) => {
+      createTab(state.title, state);
+    });
+
+    ipcRenderer.on("remove-tab-after-drag", (_event, tabId) => {
+      // Remove without unsaved-changes prompt (it moved to another window)
+      const tab = tabs[tabId];
+      if (!tab) return;
+      const tabIds = Object.keys(tabs).map(Number);
+      const idx = tabIds.indexOf(tabId);
+      tab.domEl.remove();
+      delete tabs[tabId];
+      const remaining = Object.keys(tabs).map(Number);
+      if (remaining.length === 0) {
+        createTab();
+      } else if (activeTabId === tabId) {
+        activeTabId = null;
+        switchTab(remaining[Math.min(idx, remaining.length - 1)]);
+      }
+    });
+
+    // ── Keyboard / button wiring ───────────────────────────────────────────────
     sendBtn.addEventListener("click", send);
 
     prompt.addEventListener("keydown", e => {

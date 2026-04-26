@@ -72,9 +72,20 @@ function buildMenu() {
       label: "File",
       submenu: [
         {
-          label: "New Chat",
+          label: "New Chat Window",
           accelerator: "CmdOrCtrl+N",
           click: () => createWindow()
+        },
+        {
+          label: "New Chat Tab",
+          accelerator: "CmdOrCtrl+T",
+          click: () => BrowserWindow.getFocusedWindow()?.webContents.send("new-tab")
+        },
+        { type: "separator" },
+        {
+          label: "Close Tab",
+          accelerator: "CmdOrCtrl+W",
+          click: () => BrowserWindow.getFocusedWindow()?.webContents.send("close-tab")
         },
         { type: "separator" },
         {
@@ -125,8 +136,8 @@ function buildMenu() {
         },
         { type: "separator" },
         {
-          label: "Close",
-          accelerator: "CmdOrCtrl+W",
+          label: "Close Window",
+          accelerator: "CmdOrCtrl+Shift+W",
           click: () => BrowserWindow.getFocusedWindow()?.close()
         }
       ]
@@ -465,4 +476,83 @@ ipcMain.handle("image-context-menu", async (_event, src) => {
   menu.popup({ window: mainWin });
 });
 
-app.whenReady().then(createWindow);
+// ── Tab drag-and-drop between windows ─────────────────────────────────────────
+let draggedTabState = null;  // { sourceWinId, tabId, state }
+
+ipcMain.on("tab-drag-start", (event, { tabId, state }) => {
+  draggedTabState = { sourceWinId: event.sender.id, tabId, state };
+});
+
+ipcMain.on("tab-drag-end", (event, { tabId }) => {
+  // If drop never happened on another window, clear
+  if (draggedTabState?.sourceWinId === event.sender.id) {
+    draggedTabState = null;
+  }
+});
+
+ipcMain.on("tab-drop-here", (event) => {
+  if (!draggedTabState) return;
+  const targetWinId = event.sender.id;
+  if (targetWinId === draggedTabState.sourceWinId) {
+    draggedTabState = null;
+    return;
+  }
+  // Send state to target window
+  event.sender.send("receive-tab", draggedTabState.state);
+  // Tell source window to remove the tab
+  const sourceWin = BrowserWindow.fromId(draggedTabState.sourceWinId);
+  sourceWin?.webContents.send("remove-tab-after-drag", draggedTabState.tabId);
+  draggedTabState = null;
+});
+
+// ── Confirm dialogs ────────────────────────────────────────────────────────────
+ipcMain.handle("confirm-close-tab", async (event, { title }) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWin;
+  return dialog.showMessageBox(win, {
+    type: "warning",
+    buttons: ["Save", "Close Without Saving", "Cancel"],
+    defaultId: 0,
+    cancelId: 2,
+    message: `"${title}" has unsaved changes.`,
+    detail: "Do you want to save before closing this tab?"
+  });
+});
+
+ipcMain.handle("confirm-close-window", async (event, { names }) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWin;
+  return dialog.showMessageBox(win, {
+    type: "warning",
+    buttons: ["Save All", "Close Without Saving", "Cancel"],
+    defaultId: 0,
+    cancelId: 2,
+    message: "You have unsaved chats.",
+    detail: `${names} ${names.includes(",") ? "have" : "has"} unsaved changes. Save before closing?`
+  });
+});
+
+// ── Window close: ask renderer to check for unsaved tabs ──────────────────────
+const windowsAwaitingClose = new Set();
+
+ipcMain.on("close-confirmed", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    windowsAwaitingClose.add(win.id);
+    win.close();
+  }
+});
+
+app.whenReady().then(() => {
+  // Intercept every window's close to check for unsaved tabs
+  app.on("browser-window-created", (_e, win) => {
+    win.on("close", (e) => {
+      if (win.webContents.getURL().includes("settings") || win.webContents.getURL().includes("about")) return;
+      if (windowsAwaitingClose.has(win.id)) {
+        windowsAwaitingClose.delete(win.id);
+        return; // confirmed — allow close
+      }
+      e.preventDefault();
+      win.webContents.send("check-unsaved-before-close");
+    });
+  });
+  createWindow();
+});

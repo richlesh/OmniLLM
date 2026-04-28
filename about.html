@@ -49,7 +49,8 @@
     Version <span id="app-version"></span><br>
     ©2026 Richard Lesh<br>
     Built with Electron v<span id="electron-version"></span><br>
-    <a id="website" href="https://glowingcat.com/OmniLLM.html">Glowing Cat Software</a>
+    <a id="website" href="https://glowingcat.com/OmniLLM.html">Glowing Cat Software</a><br>
+    <a id="issues" href="https://github.com/richlesh/OmniLLM/issues">Report issues on GitHub</a>
   </p>
   <button id="ok-btn">OK</button>
 
@@ -69,6 +70,11 @@
     document.getElementById("website").addEventListener("click", e => {
       e.preventDefault();
       shell.openExternal("https://glowingcat.com/OmniLLM.html");
+    });
+
+    document.getElementById("issues").addEventListener("click", e => {
+      e.preventDefault();
+      shell.openExternal("https://github.com/richlesh/OmniLLM/issues");
     });
 
     document.getElementById("ok-btn").addEventListener("click", () => {

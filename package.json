@@ -28,9 +28,11 @@
       "*.ico",
       "node_modules/**"
     ],
+    "afterPack": "./afterPack.js",
     "mac": {
       "category": "public.app-category.productivity",
-      "target": "dmg"
+      "target": "dmg",
+      "identity": "RICHARD A LESH (MMZ3Y97NTP)"
     },
     "win": {
       "target": "nsis"

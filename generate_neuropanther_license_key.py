@@ -3,10 +3,10 @@ import sys
 import hmac
 import hashlib
 
-SALT = "GlowingCat-OmniLLM-2026"
+SALT = "GlowingCat-NeuroPanther-2026"
 
 if len(sys.argv) != 2:
-    print("Usage: gen_omnillm-license.py <name>")
+    print("Usage: generate_neuropanther_license_key.py <name>")
     sys.exit(1)
 
 name = sys.argv[1].lower().strip()

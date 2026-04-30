@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>About OmniLLM</title>
+  <title>About NeuroPanther</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -44,13 +44,13 @@
 </head>
 <body>
   <img id="icon">
-  <h1>OmniLLM</h1>
+  <h1>NeuroPanther</h1>
   <p>
     Version <span id="app-version"></span><br>
     ©2026 Richard Lesh<br>
     Built with Electron v<span id="electron-version"></span><br>
-    <a id="website" href="https://glowingcat.com/OmniLLM.html">Glowing Cat Software</a><br>
-    <a id="issues" href="https://github.com/richlesh/OmniLLM/issues">Report issues on GitHub</a>
+    <a id="website" href="https://glowingcat.com/NeuroPanther.html">Glowing Cat Software</a><br>
+    <a id="issues" href="https://github.com/richlesh/NeuroPanther/issues">Report issues on GitHub</a>
   </p>
   <button id="ok-btn">OK</button>
 
@@ -69,12 +69,12 @@
 
     document.getElementById("website").addEventListener("click", e => {
       e.preventDefault();
-      ipcRenderer.invoke("open-external", "https://glowingcat.com/OmniLLM.html");
+      ipcRenderer.invoke("open-external", "https://glowingcat.com/NeuroPanther.html");
     });
 
     document.getElementById("issues").addEventListener("click", e => {
       e.preventDefault();
-      ipcRenderer.invoke("open-external", "https://github.com/richlesh/OmniLLM/issues");
+      ipcRenderer.invoke("open-external", "https://github.com/richlesh/NeuroPanther/issues");
     });
 
     document.getElementById("ok-btn").addEventListener("click", () => {

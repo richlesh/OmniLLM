@@ -66,7 +66,7 @@
   <p>Enter your name and license key</p>
   <input id="name-input" type="text" placeholder="Your name" spellcheck="false">
   <input id="license-input" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" spellcheck="false" maxlength="19">
-  <a id="donate-link" href="https://glowingcat.com/OmniLLM.html">Donate at Glowing Cat Software to get a license key.</a>
+  <a id="donate-link" href="https://glowingcat.com/NeuroPanther.html">Donate at Glowing Cat Software to get a license key.</a>
   <div class="buttons">
     <button id="cancel-btn">Cancel</button>
     <button id="save-btn" disabled>Save</button>
@@ -78,7 +78,7 @@
 
     document.getElementById("donate-link").addEventListener("click", e => {
       e.preventDefault();
-      ipcRenderer.invoke("open-external", "https://glowingcat.com/OmniLLM.html");
+      ipcRenderer.invoke("open-external", "https://glowingcat.com/NeuroPanther.html");
     });
 
     const nameInput    = document.getElementById("name-input");
@@ -91,7 +91,7 @@
     }
 
     function expectedKey(name) {
-      const hmac = nodeCrypto.createHmac("sha256", "GlowingCat-OmniLLM-2026");
+      const hmac = nodeCrypto.createHmac("sha256", "GlowingCat-NeuroPanther-2026");
       hmac.update(name.toLowerCase().trim());
       return hmac.digest("hex").slice(0, 16).toUpperCase();
     }

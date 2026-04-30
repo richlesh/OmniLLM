@@ -7,7 +7,7 @@ const https = require("https");
 const { spawn } = require("child_process");
 const nodeCrypto = require("crypto");
 const { load, save, VENDORS } = require("./settings");
-const LICENSE_SALT = "GlowingCat-OmniLLM-2026";
+const LICENSE_SALT = "GlowingCat-NeuroPanther-2026";
 
 function openExternal(url) {
   if (process.platform === "linux") {
@@ -36,13 +36,13 @@ function isValidLicense(key, userName) {
 
 const appIcon = nativeImage.createFromPath(path.join(__dirname, "app_icon.icns"));
 
-app.name = "OmniLLM";
+app.name = "NeuroPanther";
 
 app.setAboutPanelOptions({
-  applicationName: "OmniLLM",
+  applicationName: "NeuroPanther",
   applicationVersion: require("./package.json").version,
   credits: `by Richard Lesh\nBuilt with Electron v${process.versions.electron}`,
-  website: "https://glowingcatsoftware.com/OmniLLM.html",
+  website: "https://glowingcatsoftware.com/NeuroPanther.html",
   iconImage: appIcon
 });
 
@@ -90,7 +90,7 @@ function buildMenu() {
     {
       label: app.name,
       submenu: [
-        { label: "About OmniLLM", click: showAbout },
+        { label: "About NeuroPanther", click: showAbout },
         { type: "separator" },
         { label: "Settings…", click: openSettings },
         { label: "License Key…", click: openLicense },
@@ -417,7 +417,7 @@ ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model:
 ipcMain.handle("save-temp-image", (_event, { base64, mediaType }) => {
   const os = require("os");
   const ext = mediaType.split("/")[1] || "png";
-  const tempPath = path.join(os.tmpdir(), `omnillm-img-${Date.now()}.${ext}`);
+  const tempPath = path.join(os.tmpdir(), `neuropanther-img-${Date.now()}.${ext}`);
   fs.writeFileSync(tempPath, Buffer.from(base64, "base64"));
   return tempPath;
 });

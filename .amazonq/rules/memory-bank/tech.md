@@ -1,4 +1,4 @@
-# OmniLLM — Technology Stack
+# NeuroPanther — Technology Stack
 
 ## Runtime & Framework
 - **Electron** ^41.3.0 — cross-platform desktop shell (Chromium + Node.js)
@@ -27,8 +27,8 @@
 
 ## Build & Distribution
 - **electron-builder** handles packaging for all platforms
-- App ID: `com.richardlesh.omni-llm`
-- Artifact naming: `OmniLLM-{version}-{arch}.{ext}`
+- App ID: `com.richardlesh.neuropanther`
+- Artifact naming: `NeuroPanther-{version}-{arch}.{ext}`
 
 ### Build Targets
 | Platform | Format |
@@ -50,10 +50,10 @@ npm run dist:all           # All platforms sequentially
 ```
 
 ## Utility Script
-- `generate_omnillm-license-key.py` — standalone Python script for license key generation (no Python version pinned; standard library only assumed)
+- `generate_neuropanther_license_key.py` — standalone Python script for license key generation (no Python version pinned; standard library only assumed)
 
 ## Persisted Data
-- Settings file: `~/.omnillm-settings.json` (written by main process via `fs` module)
+- Settings file: `~/.neuropanther-settings.json` (written by main process via `fs` module)
 - Structure: `{ vendor, model, apiKeys: { [vendorId]: string } }`
 
 ## Vendor API Endpoints

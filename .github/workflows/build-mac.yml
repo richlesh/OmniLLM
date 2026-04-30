@@ -61,4 +61,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ github.event.inputs.tag }} \
-            dist/OmniLLM-*.dmg --clobber
+            dist/NeuroPanther-*.dmg --clobber

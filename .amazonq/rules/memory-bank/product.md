@@ -1,7 +1,7 @@
-# OmniLLM — Product Overview
+# NeuroPanther — Product Overview
 
 ## Purpose
-OmniLLM is a cross-platform desktop chatbot application built with Electron that provides a unified interface for interacting with multiple AI vendors and models. It eliminates the need to switch between different web interfaces by consolidating access to major LLM providers in one native desktop app.
+NeuroPanther is a cross-platform desktop chat application built with Electron that provides a unified interface for interacting with multiple AI vendors and models. It eliminates the need to switch between different web interfaces by consolidating access to major LLM providers in one native desktop app.
 
 ## Version
 1.2.0 (package.json) / 1.1.0 (README)
@@ -35,7 +35,7 @@ OmniLLM is a cross-platform desktop chatbot application built with Electron that
 
 ### Settings & Configuration
 - Per-vendor API key storage
-- Settings persisted to `~/.omnillm-settings.json`
+- Settings persisted to `~/.neuropanther-settings.json`
 - Vendor/model selection via dropdowns
 - Direct links to each vendor's API key page
 

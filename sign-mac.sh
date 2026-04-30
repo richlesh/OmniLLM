@@ -40,5 +40,5 @@ sign_app() {
   codesign --verify --deep --strict "$APP" && echo "OK" || echo "FAILED"
 }
 
-sign_app "dist/mac/OmniLLM.app"
-sign_app "dist/mac-arm64/OmniLLM.app"
+sign_app "dist/mac/NeuroPanther.app"
+sign_app "dist/mac-arm64/NeuroPanther.app"

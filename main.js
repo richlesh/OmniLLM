@@ -239,7 +239,7 @@ function openSettings() {
   if (settingsWin) return settingsWin.focus();
   settingsWin = new BrowserWindow({
     width: 420,
-    height: 350,
+    height: 500,
     resizable: false,
     parent: mainWin,
     modal: true,
@@ -422,6 +422,187 @@ ipcMain.handle("open-external", (_e, url) => openExternal(url));
 ipcMain.handle("drop-chat-file", (_e, filePath) => {
   if (!filePath.endsWith(".chat")) return null;
   return loadChatFile(filePath);
+});
+
+// ── Agent tools ────────────────────────────────────────────────────────────────
+function resolveSafePath(workDir, filePath) {
+  const resolved = path.resolve(workDir, filePath);
+  if (!resolved.startsWith(path.resolve(workDir))) throw new Error(`Path outside working directory: ${filePath}`);
+  return resolved;
+}
+
+ipcMain.handle("agent-get-working-dir", () => load().workingDir || null);
+
+ipcMain.handle("agent-browse-dir", async () => {
+  const { filePaths } = await dialog.showOpenDialog(settingsWin || mainWin, {
+    title: "Select Working Directory",
+    properties: ["openDirectory"]
+  });
+  return filePaths?.[0] || null;
+});
+
+ipcMain.handle("agent-set-working-dir", async () => {
+  const { filePaths } = await dialog.showOpenDialog(mainWin, {
+    title: "Select Working Directory",
+    properties: ["openDirectory"]
+  });
+  if (!filePaths?.length) return null;
+  const settings = load();
+  save({ ...settings, workingDir: filePaths[0] });
+  return filePaths[0];
+});
+
+ipcMain.handle("agent-execute-tool", async (_event, { tool, args }) => {
+  const settings = load();
+  const workDir = settings.workingDir || require("os").homedir();
+  try {
+    if (tool === "read_file") {
+      const p = resolveSafePath(workDir, args.path);
+      return { ok: true, result: fs.readFileSync(p, "utf8") };
+    }
+    if (tool === "write_file") {
+      const p = resolveSafePath(workDir, args.path);
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, args.content, "utf8");
+      return { ok: true, result: `Written ${args.path}` };
+    }
+    if (tool === "list_directory") {
+      const p = resolveSafePath(workDir, args.path || ".");
+      const entries = fs.readdirSync(p, { withFileTypes: true });
+      return { ok: true, result: entries.map(e => (e.isDirectory() ? `[dir] ${e.name}` : e.name)).join("\n") };
+    }
+    if (tool === "search_files") {
+      const results = [];
+      function walk(dir) {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, e.name);
+          if (e.isDirectory() && !e.name.startsWith(".") && e.name !== "node_modules") walk(full);
+          else if (e.isFile()) {
+            try {
+              const content = fs.readFileSync(full, "utf8");
+              const lines = content.split("\n");
+              lines.forEach((line, i) => {
+                if (line.toLowerCase().includes(args.pattern.toLowerCase())) {
+                  results.push(`${path.relative(workDir, full)}:${i + 1}: ${line.trim()}`);
+                }
+              });
+            } catch { /* skip binary files */ }
+          }
+        }
+      }
+      walk(resolveSafePath(workDir, args.path || "."));
+      return { ok: true, result: results.slice(0, 100).join("\n") || "No matches found" };
+    }
+    if (tool === "run_code") {
+      return await new Promise(resolve => {
+        const proc = spawn(args.command, { shell: true, cwd: workDir });
+        let stdout = "", stderr = "";
+        proc.stdout.on("data", d => { stdout += d; });
+        proc.stderr.on("data", d => { stderr += d; });
+        proc.on("close", code => resolve({ ok: true, result: (stdout + stderr).slice(0, 4000) + (code !== 0 ? `\n[exit ${code}]` : "") }));
+        setTimeout(() => { proc.kill(); resolve({ ok: true, result: "[timeout after 30s]" }); }, 30000);
+      });
+    }
+    if (tool === "web_search") {
+      const apiKey = settings.apiKeys?.["brave"] || "";
+      if (!apiKey) return { ok: false, result: "Brave Search API key not set in Settings" };
+      const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(args.query)}&count=5`;
+      const res = await fetch(url, { headers: { "Accept": "application/json", "X-Subscription-Token": apiKey } });
+      const data = await res.json();
+      const results = (data.web?.results || []).map(r => `${r.title}\n${r.url}\n${r.description}`).join("\n\n");
+      return { ok: true, result: results || "No results" };
+    }
+    return { ok: false, result: `Unknown tool: ${tool}` };
+  } catch (err) {
+    return { ok: false, result: err.message };
+  }
+});
+
+// ── Streaming chat ─────────────────────────────────────────────────────────────
+const AGENT_TOOLS = [
+  { type: "function", function: { name: "read_file",      description: "Read a file from the working directory",                    parameters: { type: "object", properties: { path: { type: "string", description: "Relative file path" } }, required: ["path"] } } },
+  { type: "function", function: { name: "write_file",     description: "Write content to a file in the working directory",          parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } },
+  { type: "function", function: { name: "list_directory", description: "List files and folders in a directory",                     parameters: { type: "object", properties: { path: { type: "string", description: "Relative path, defaults to root" } }, required: [] } } },
+  { type: "function", function: { name: "search_files",   description: "Search for a text pattern across files in the project",    parameters: { type: "object", properties: { pattern: { type: "string" }, path: { type: "string", description: "Directory to search, defaults to root" } }, required: ["pattern"] } } },
+  { type: "function", function: { name: "run_code",       description: "Run a shell command in the working directory",              parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"] } } },
+  { type: "function", function: { name: "web_search",     description: "Search the web using Brave Search",                        parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } } }
+];
+
+const ANTHROPIC_TOOLS = AGENT_TOOLS.map(t => ({
+  name: t.function.name,
+  description: t.function.description,
+  input_schema: t.function.parameters
+}));
+
+ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode }) => {
+  const settings = load();
+  const apiKey = settings.apiKeys?.[vendor] || "";
+  if (!apiKey) { event.sender.send("stream-error", "You need to set the API key in Settings before this LLM vendor can be used."); return; }
+
+  const tools = agentMode ? (vendor === "anthropic" ? ANTHROPIC_TOOLS : AGENT_TOOLS) : undefined;
+
+  try {
+    if (vendor === "anthropic") {
+      const client = new Anthropic({ apiKey });
+      const sysMsg = messages.find(m => m.role === "system");
+      const userMsgs = messages.filter(m => m.role !== "system");
+      const stream = await client.messages.stream({
+        model, max_tokens: 8096,
+        system: sysMsg?.content,
+        messages: userMsgs,
+        ...(tools ? { tools } : {})
+      });
+      let fullText = "";
+      for await (const chunk of stream) {
+        if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+          fullText += chunk.delta.text;
+          event.sender.send("stream-chunk", chunk.delta.text);
+        }
+        if (chunk.type === "content_block_start" && chunk.content_block?.type === "tool_use") {
+          // tool call coming — collect it
+        }
+      }
+      const finalMsg = await stream.finalMessage();
+      const toolUses = finalMsg.content.filter(b => b.type === "tool_use");
+      if (toolUses.length > 0) {
+        event.sender.send("stream-tool-calls", toolUses.map(t => ({ id: t.id, name: t.name, args: t.input })));
+      } else {
+        event.sender.send("stream-done", fullText);
+      }
+    } else {
+      const client = new OpenAI({ apiKey, baseURL: VENDORS[vendor]?.baseURL });
+      const stream = await client.chat.completions.create({ model, messages, stream: true, ...(tools ? { tools, tool_choice: "auto" } : {}) });
+      let fullText = "";
+      const toolCallMap = {};
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
+          fullText += delta.content;
+          event.sender.send("stream-chunk", delta.content);
+        }
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            if (!toolCallMap[tc.index]) toolCallMap[tc.index] = { id: "", name: "", argsRaw: "" };
+            if (tc.id)            toolCallMap[tc.index].id       += tc.id;
+            if (tc.function?.name) toolCallMap[tc.index].name    += tc.function.name;
+            if (tc.function?.arguments) toolCallMap[tc.index].argsRaw += tc.function.arguments;
+          }
+        }
+      }
+      const toolCalls = Object.values(toolCallMap);
+      if (toolCalls.length > 0) {
+        event.sender.send("stream-tool-calls", toolCalls.map(tc => {
+          let args = {};
+          try { args = JSON.parse(tc.argsRaw); } catch { args = { raw: tc.argsRaw }; }
+          return { id: tc.id, name: tc.name, args };
+        }));
+      } else {
+        event.sender.send("stream-done", fullText);
+      }
+    }
+  } catch (err) {
+    event.sender.send("stream-error", err.message);
+  }
 });
 
 ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model: modelOverride }) => {

@@ -142,6 +142,43 @@
       cursor: pointer;
     }
 
+    #agent-row {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: #252525;
+      border-top: 1px solid #333;
+      font-size: 12px;
+      color: #aaa;
+    }
+    #agent-row.visible { display: flex; }
+    #agent-row span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-row button { background: #3a3a3c; border: none; color: #aaa; border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+    #agent-row button:hover { background: #4a4a4e; color: #e0e0e0; }
+
+    .tool-card {
+      align-self: flex-start;
+      background: #1a2a1a;
+      border: 1px solid #2a4a2a;
+      border-radius: 12px;
+      padding: 10px 14px;
+      max-width: 75%;
+      font-size: 13px;
+    }
+    .tool-card.denied { background: #2a1a1a; border-color: #4a2a2a; }
+    .tool-card.executed { background: #1a1a2a; border-color: #2a2a4a; }
+    .tool-card-header { font-weight: 600; color: #4ade80; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .tool-card.denied .tool-card-header { color: #f87171; }
+    .tool-card.executed .tool-card-header { color: #60a5fa; }
+    .tool-card-args { font-family: 'JetBrains Mono NL', monospace; font-size: 11px; color: #aaa; background: #111; border-radius: 6px; padding: 6px 8px; margin-bottom: 8px; white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto; }
+    .tool-card-result { font-family: 'JetBrains Mono NL', monospace; font-size: 11px; color: #ccc; background: #111; border-radius: 6px; padding: 6px 8px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; }
+    .tool-card-btns { display: flex; gap: 8px; margin-top: 8px; }
+    .tool-allow-btn { background: #166534; border: none; color: #4ade80; border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+    .tool-allow-btn:hover { background: #15803d; }
+    .tool-deny-btn  { background: #7f1d1d; border: none; color: #f87171; border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+    .tool-deny-btn:hover  { background: #991b1b; }
+
     #input-area {
       display: flex;
       align-items: flex-end;
@@ -336,6 +373,11 @@
         <path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>
       </svg>
     </button>
+    <button class="icon-btn" id="agent-btn" title="Agent Mode">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+      </svg>
+    </button>
     <textarea id="prompt" rows="1" placeholder="Message…"></textarea>
     <button id="send-btn" title="Send">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -350,6 +392,11 @@
     <select id="from-lang"></select>
     <label>To</label>
     <select id="to-lang"></select>
+  </div>
+
+  <div id="agent-row">
+    <span id="agent-dir-label">No working directory set</span>
+    <button id="agent-dir-btn">Set Directory</button>
   </div>
 
   <input type="file" id="file-input" accept="image/*" style="display:none">
@@ -379,6 +426,10 @@
     const translateRow  = document.getElementById("translate-row");
     const fromLangSel   = document.getElementById("from-lang");
     const toLangSel     = document.getElementById("to-lang");
+    const agentBtn      = document.getElementById("agent-btn");
+    const agentRow      = document.getElementById("agent-row");
+    const agentDirLabel = document.getElementById("agent-dir-label");
+    const agentDirBtn   = document.getElementById("agent-dir-btn");
     const fileInput    = document.getElementById("file-input");
 
     const LANGUAGES = [
@@ -396,7 +447,7 @@
       toLangSel.append(Object.assign(document.createElement("option"), { value: lang, textContent: lang }));
     });
     fromLangSel.value = "English";
-    toLangSel.value = "Spanish";
+    toLangSel.value = "English";
     const previewWrap  = document.getElementById("image-preview-wrap");
     const previewImg   = document.getElementById("image-preview");
     const clearBtn     = document.getElementById("image-clear-btn");
@@ -428,7 +479,8 @@
         imagineMode: false,
         translateMode: false,
         fromLang: "English",
-        toLang: "Spanish",
+        toLang: "English",
+        agentMode: false,
         attachedImage: null,
         vendor: restore ? restore.vendor : null,
         model: restore ? restore.model : null,
@@ -572,6 +624,10 @@
       fromLangSel.value = tab.fromLang || "English";
       toLangSel.value   = tab.toLang   || "Spanish";
 
+      // sync agent mode UI
+      agentBtn.classList.toggle("active", tab.agentMode);
+      agentRow.classList.toggle("visible", tab.agentMode);
+
       // repopulate vendor list filtered by this tab's imagineMode, then restore vendor/model
       const targetVendor = tab.vendor || vendorSel.value;
       populateVendorSelectOnly(allVendors, targetVendor, tab.imagineMode);
@@ -678,6 +734,11 @@
       allVendors = vendors;
       rememberedModel[settings.vendor] = settings.model;
       populateVendorSelect(vendors, settings.vendor, false);
+
+      // load working directory
+      ipcRenderer.invoke("agent-get-working-dir").then(dir => {
+        if (dir) agentDirLabel.textContent = dir;
+      });
 
       vendorSel.addEventListener("change", () => {
         rememberedModel[vendorSel.dataset.prev] = modelSel.value;
@@ -798,6 +859,19 @@
     fromLangSel.addEventListener("change", () => { const tab = activeTab(); if (tab) tab.fromLang = fromLangSel.value; });
     toLangSel.addEventListener("change",   () => { const tab = activeTab(); if (tab) tab.toLang   = toLangSel.value; });
 
+    agentBtn.addEventListener("click", () => {
+      const tab = activeTab();
+      if (!tab) return;
+      tab.agentMode = !tab.agentMode;
+      agentBtn.classList.toggle("active", tab.agentMode);
+      agentRow.classList.toggle("visible", tab.agentMode);
+    });
+
+    agentDirBtn.addEventListener("click", async () => {
+      const dir = await ipcRenderer.invoke("agent-set-working-dir");
+      if (dir) agentDirLabel.textContent = dir;
+    });
+
     // ── New tab button ─────────────────────────────────────────────────────────
     newTabBtn.addEventListener("click", () => createTab());
 
@@ -896,12 +970,18 @@
         markUnsaved(tabId);
         const thinking = addMessage("assistant", "…", tabId);
         try {
-          const reply = await ipcRenderer.invoke("chat", { messages: tab.history, vendor, model });
-          thinking.innerHTML = marked.parse(reply);
-          addCodeCopyButtons(thinking);
-          thinking.appendChild(makeActions(reply));
-          tab.history.push({ role: "assistant", content: reply });
-          tab.chatLog.push({ role: "assistant", content: reply, images: [] });
+        if (tab.agentMode) {
+          const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+          const sysContent = `You are a helpful AI assistant with access to tools. Today's date is ${today}. Use tools as needed to answer the user's request.`;
+          if (!tab.history.length || tab.history[0].role !== "system") {
+            tab.history.unshift({ role: "system", content: sysContent });
+          } else {
+            tab.history[0].content = sysContent;
+          }
+          await runAgentLoop(tab, tabId, vendor, model, thinking);
+        } else {
+          await runStreaming(tab, tabId, vendor, model, thinking);
+        }
         } catch (err) {
           thinking.className = "msg error";
           thinking.textContent = "Error: " + err.message;
@@ -922,6 +1002,147 @@
       tab.container.appendChild(div);
       if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
       return div;
+    }
+
+    // ── Streaming ────────────────────────────────────────────────────────────────
+    function runStreaming(tab, tabId, vendor, model, thinkingEl) {
+      return new Promise((resolve, reject) => {
+        let reply = "";
+        thinkingEl.textContent = "";
+
+        const onChunk = (_e, chunk) => { reply += chunk; thinkingEl.innerHTML = marked.parse(reply); addCodeCopyButtons(thinkingEl); if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight; };
+        const onDone  = (_e, full)  => { cleanup(); finishAssistant(tab, tabId, thinkingEl, full); resolve(); };
+        const onError = (_e, msg)   => { cleanup(); reject(new Error(msg)); };
+
+        function cleanup() {
+          ipcRenderer.removeListener("stream-chunk", onChunk);
+          ipcRenderer.removeListener("stream-done",  onDone);
+          ipcRenderer.removeListener("stream-error", onError);
+          ipcRenderer.removeListener("stream-tool-calls", onTools);
+        }
+        const onTools = () => { cleanup(); reject(new Error("Unexpected tool call in non-agent mode")); };
+
+        ipcRenderer.on("stream-chunk",      onChunk);
+        ipcRenderer.on("stream-done",       onDone);
+        ipcRenderer.on("stream-error",      onError);
+        ipcRenderer.on("stream-tool-calls", onTools);
+        ipcRenderer.send("chat-stream", { messages: tab.history, vendor, model, agentMode: false });
+      });
+    }
+
+    function finishAssistant(tab, tabId, el, reply) {
+      el.innerHTML = marked.parse(reply);
+      addCodeCopyButtons(el);
+      el.appendChild(makeActions(reply));
+      tab.history.push({ role: "assistant", content: reply });
+      tab.chatLog.push({ role: "assistant", content: reply, images: [] });
+      markUnsaved(tabId);
+    }
+
+    // ── Agentic loop ─────────────────────────────────────────────────────────────
+    async function runAgentLoop(tab, tabId, vendor, model, thinkingEl) {
+      const MAX_TURNS = 20;
+      let turns = 0;
+      let currentEl = thinkingEl;
+
+      while (turns++ < MAX_TURNS) {
+        const toolCalls = await new Promise((resolve, reject) => {
+          let reply = "";
+          currentEl.textContent = "";
+
+          const onChunk = (_e, chunk) => { reply += chunk; currentEl.innerHTML = marked.parse(reply); addCodeCopyButtons(currentEl); if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight; };
+          const onDone  = (_e, full)  => { cleanup(); finishAssistant(tab, tabId, currentEl, full); resolve(null); };
+          const onError = (_e, msg)   => { cleanup(); reject(new Error(msg)); };
+          const onTools = (_e, calls) => { cleanup(); resolve(calls); };
+
+          function cleanup() {
+            ipcRenderer.removeListener("stream-chunk",      onChunk);
+            ipcRenderer.removeListener("stream-done",       onDone);
+            ipcRenderer.removeListener("stream-error",      onError);
+            ipcRenderer.removeListener("stream-tool-calls", onTools);
+          }
+
+          ipcRenderer.on("stream-chunk",      onChunk);
+          ipcRenderer.on("stream-done",       onDone);
+          ipcRenderer.on("stream-error",      onError);
+          ipcRenderer.on("stream-tool-calls", onTools);
+          ipcRenderer.send("chat-stream", { messages: tab.history, vendor, model, agentMode: true });
+        });
+
+        if (!toolCalls) break; // model gave a final text response
+
+        // push assistant tool-call message to history
+        if (vendor === "anthropic") {
+          tab.history.push({ role: "assistant", content: toolCalls.map(tc => ({ type: "tool_use", id: tc.id, name: tc.name, input: tc.args })) });
+        } else {
+          tab.history.push({ role: "assistant", content: null, tool_calls: toolCalls.map(tc => ({ id: tc.id, type: "function", function: { name: tc.name, arguments: JSON.stringify(tc.args) } })) });
+        }
+
+        // show approval cards and collect results
+        const toolResults = [];
+        for (const tc of toolCalls) {
+          const approved = await showToolApproval(tab, tabId, tc);
+          let result;
+          if (approved) {
+            const { ok, result: r } = await ipcRenderer.invoke("agent-execute-tool", { tool: tc.name, args: tc.args });
+            result = ok ? r : `Error: ${r}`;
+            showToolResult(tab, tabId, tc, result);
+          } else {
+            result = "User denied this tool call.";
+            showToolDenied(tab, tabId, tc);
+          }
+          if (vendor === "anthropic") {
+            toolResults.push({ type: "tool_result", tool_use_id: tc.id, content: result });
+          } else {
+            toolResults.push({ role: "tool", tool_call_id: tc.id, content: result });
+          }
+        }
+
+        // push tool results to history
+        if (vendor === "anthropic") {
+          tab.history.push({ role: "user", content: toolResults });
+        } else {
+          for (const r of toolResults) tab.history.push(r);
+        }
+
+        // next turn
+        currentEl = addMessage("assistant", "…", tabId);
+      }
+    }
+
+    function showToolApproval(tab, tabId, tc) {
+      return new Promise(resolve => {
+        const card = document.createElement("div");
+        card.className = "tool-card";
+        const argsStr = JSON.stringify(tc.args, null, 2);
+        card.innerHTML = `<div class="tool-card-header">⚡ ${tc.name}</div><div class="tool-card-args">${argsStr}</div><div class="tool-card-btns"><button class="tool-allow-btn">Allow</button><button class="tool-deny-btn">Deny</button></div>`;
+        tabs[tabId].container.appendChild(card);
+        if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
+        card.querySelector(".tool-allow-btn").addEventListener("click", () => { card.querySelector(".tool-card-btns").remove(); resolve(true); });
+        card.querySelector(".tool-deny-btn").addEventListener("click",  () => { card.querySelector(".tool-card-btns").remove(); card.classList.add("denied"); resolve(false); });
+      });
+    }
+
+    function showToolResult(tab, tabId, tc, result) {
+      const card = tabs[tabId].container.querySelector(".tool-card:not(.executed):not(.denied)");
+      if (card) {
+        card.classList.add("executed");
+        card.querySelector(".tool-card-header").textContent = `✓ ${tc.name}`;
+        const res = document.createElement("div");
+        res.className = "tool-card-result";
+        res.textContent = result.slice(0, 2000) + (result.length > 2000 ? "…" : "");
+        card.appendChild(res);
+        if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
+      }
+    }
+
+    function showToolDenied(tab, tabId, tc) {
+      const card = tabs[tabId].container.querySelector(".tool-card:not(.executed):not(.denied)");
+      if (card) {
+        card.classList.add("denied");
+        card.querySelector(".tool-card-header").textContent = `✗ ${tc.name} (denied)`;
+        if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
+      }
     }
 
     function makeActions(plainText) {

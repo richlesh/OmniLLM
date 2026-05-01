@@ -43,9 +43,15 @@
     #save-btn   { background: #0a84ff; color: #fff; }
     #api-key-link { font-size: 12px; color: #4da3ff; text-decoration: none; margin-top: 4px; display: inline-block; }
     #api-key-link:hover { text-decoration: underline; }
+    .section-title { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; padding-top: 12px; border-top: 1px solid #333; }
+    .dir-row { display: flex; gap: 8px; align-items: center; }
+    .dir-row input { flex: 1; }
+    .dir-btn { padding: 8px 12px; border-radius: 8px; border: none; background: #3a3a3c; color: #e0e0e0; cursor: pointer; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+    .dir-btn:hover { background: #4a4a4e; }
   </style>
 </head>
 <body>
+  <div class="section-title" style="border-top:none;margin-top:0;padding-top:0;">LLM Settings</div>
   <div>
     <label>Vendor</label>
     <select id="vendor"></select>
@@ -59,6 +65,21 @@
     <input id="apiKey" type="password" placeholder="Enter API key…">
     <a id="api-key-link" href="#" target="_blank">Get API key…</a>
   </div>
+
+  <!-- Agent Settings -->
+  <div class="section-title">Agent Settings</div>
+  <div>
+    <label>Working Directory</label>
+    <div class="dir-row">
+      <input id="working-dir" type="text" placeholder="No directory selected…" readonly>
+      <button class="dir-btn" id="browse-dir-btn">Browse…</button>
+    </div>
+  </div>
+  <div>
+    <label>Brave Search API Key <a id="brave-key-link" href="https://api.search.brave.com" style="font-size:11px;color:#4da3ff;text-decoration:none;margin-left:6px;">Get key…</a></label>
+    <input id="brave-api-key" type="password" placeholder="Enter Brave Search API key…">
+  </div>
+
   <div class="row">
     <button id="cancel-btn">Cancel</button>
     <button id="save-btn">Save</button>
@@ -89,6 +110,9 @@
       await populateModels(current.vendor, current.model);
       apiKeyIn.value = current.apiKeys[current.vendor] || "";
       updateLink(current.vendor);
+
+      document.getElementById("working-dir").value = current.workingDir || "";
+      document.getElementById("brave-api-key").value = current.apiKeys["brave"] || "";
     });
 
     function updateLink(vendor) {
@@ -131,12 +155,24 @@
       ipcRenderer.invoke("open-external", apiKeyLink.href);
     });
 
+    document.getElementById("brave-key-link").addEventListener("click", e => {
+      e.preventDefault();
+      ipcRenderer.invoke("open-external", "https://api.search.brave.com");
+    });
+
+    document.getElementById("browse-dir-btn").addEventListener("click", async () => {
+      const dir = await ipcRenderer.invoke("agent-browse-dir");
+      if (dir) document.getElementById("working-dir").value = dir;
+    });
+
     document.getElementById("save-btn").addEventListener("click", () => {
       current.apiKeys[vendorSel.value] = apiKeyIn.value;
+      current.apiKeys["brave"] = document.getElementById("brave-api-key").value;
       ipcRenderer.invoke("settings-save", {
         vendor: vendorSel.value,
         model: modelSel.value,
-        apiKeys: current.apiKeys
+        apiKeys: current.apiKeys,
+        workingDir: document.getElementById("working-dir").value
       });
     });
 

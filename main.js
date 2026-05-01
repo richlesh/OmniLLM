@@ -239,7 +239,7 @@ function openSettings() {
   if (settingsWin) return settingsWin.focus();
   settingsWin = new BrowserWindow({
     width: 420,
-    height: 500,
+    height: 580,
     resizable: false,
     parent: mainWin,
     modal: true,

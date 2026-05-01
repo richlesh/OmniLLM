@@ -76,8 +76,15 @@
     </div>
   </div>
   <div>
-    <label>Brave Search API Key <a id="brave-key-link" href="https://api.search.brave.com" style="font-size:11px;color:#4da3ff;text-decoration:none;margin-left:6px;">Get key…</a></label>
+    <label>Brave Search API Key <a id="brave-key-link" href="https://api.search.brave.com" style="font-size:11px;color:#4da3ff;text-decoration:none;margin-left:6px;">Get API key…</a></label>
     <input id="brave-api-key" type="password" placeholder="Enter Brave Search API key…">
+  </div>
+
+  <!-- Translation Settings -->
+  <div class="section-title">Translation Settings</div>
+  <div>
+    <label>Default Response Language</label>
+    <select id="default-to-lang"></select>
   </div>
 
   <div class="row">
@@ -98,6 +105,7 @@
     ipcRenderer.invoke("settings-get-data").then(async ({ settings, VENDORS }) => {
       vendors = VENDORS;
       current = settings;
+      if (!current.defaultModels) current.defaultModels = {};
 
       for (const [key, v] of Object.entries(vendors)) {
         const opt = document.createElement("option");
@@ -107,12 +115,29 @@
       }
 
       vendorSel.value = current.vendor;
-      await populateModels(current.vendor, current.model);
+      vendorSel.dataset.prev = current.vendor;
+      await populateModels(current.vendor, current.defaultModels[current.vendor] || current.model);
       apiKeyIn.value = current.apiKeys[current.vendor] || "";
       updateLink(current.vendor);
 
       document.getElementById("working-dir").value = current.workingDir || "";
       document.getElementById("brave-api-key").value = current.apiKeys["brave"] || "";
+
+      const LANGUAGES = [
+        "Afrikaans","Arabic","Bengali","Bulgarian","Catalan","Chinese (Simplified)",
+        "Chinese (Traditional)","Croatian","Czech","Danish","Dutch","English",
+        "Estonian","Finnish","French","German","Greek","Gujarati","Hebrew","Hindi",
+        "Hungarian","Indonesian","Italian","Japanese","Kannada","Korean","Latvian",
+        "Lithuanian","Malay","Malayalam","Marathi","Norwegian","Persian","Polish",
+        "Portuguese","Punjabi","Romanian","Russian","Serbian","Slovak","Slovenian",
+        "Spanish","Swahili","Swedish","Tamil","Telugu","Thai","Turkish","Ukrainian",
+        "Urdu","Vietnamese"
+      ];
+      const toSel = document.getElementById("default-to-lang");
+      LANGUAGES.forEach(lang => {
+        toSel.append(Object.assign(document.createElement("option"), { value: lang, textContent: lang }));
+      });
+      toSel.value = current.defaultToLang || "English";
     });
 
     function updateLink(vendor) {
@@ -136,10 +161,16 @@
     }
 
     vendorSel.addEventListener("change", async () => {
+      current.defaultModels[vendorSel.dataset.prev] = modelSel.value;
       current.apiKeys[vendorSel.value] = current.apiKeys[vendorSel.value] || "";
       apiKeyIn.value = current.apiKeys[vendorSel.value];
       updateLink(vendorSel.value);
-      await populateModels(vendorSel.value);
+      vendorSel.dataset.prev = vendorSel.value;
+      await populateModels(vendorSel.value, current.defaultModels[vendorSel.value]);
+    });
+
+    modelSel.addEventListener("change", () => {
+      current.defaultModels[vendorSel.value] = modelSel.value;
     });
 
     // re-fetch models when API key is changed
@@ -167,12 +198,15 @@
 
     document.getElementById("save-btn").addEventListener("click", () => {
       current.apiKeys[vendorSel.value] = apiKeyIn.value;
+      current.defaultModels[vendorSel.value] = modelSel.value;
       current.apiKeys["brave"] = document.getElementById("brave-api-key").value;
       ipcRenderer.invoke("settings-save", {
         vendor: vendorSel.value,
         model: modelSel.value,
         apiKeys: current.apiKeys,
-        workingDir: document.getElementById("working-dir").value
+        defaultModels: current.defaultModels,
+        workingDir: document.getElementById("working-dir").value,
+        defaultToLang: document.getElementById("default-to-lang").value
       });
     });
 

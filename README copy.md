@@ -1,6 +1,6 @@
 # NeuroPanther Chat v1.3.0
 
-A cross-platform desktop chat/agent application built with Electron that supports multiple AI vendors and models.
+A cross-platform desktop chatbot application built with Electron that supports multiple AI vendors and models.
 
 *by Richard Lesh*
 
@@ -17,25 +17,21 @@ Connect to any of the following AI providers:
 - **Alibaba** — Qwen Max, Qwen Plus, Qwen Turbo
 - **Meta** — Llama 3.3 70B, Llama 3.1 8B
 
+### Tabbed Windows
+- Run multiple independent chats simultaneously using tabs
+- Open a new tab with the **+** button or **Cmd/Ctrl+T**
+- Close a tab with **Cmd/Ctrl+W** or the × button on the tab
+- Double-click a tab title to rename it
+- Drag tabs between windows to reorganize chats
+- Each tab maintains its own conversation history, vendor, and model selection
+- Unsaved tabs are marked with a **•** indicator; you are prompted to save before closing
+
 ### Chat
 - Scrolling chat history with user and assistant message bubbles
 - Full **Markdown rendering** with syntax-highlighted code blocks
 - Conversation history maintained across turns for context-aware responses
 - Submit with **Enter** key or the return button; **Shift+Enter** for new lines
 - Auto-growing text input
-
-### Language Translation Capability
-- Seamlessly translate text across multiple languages within chat conversations.
-- Supports real-time translation for more than 100 languages, enabling broader communication and understanding.
-
-### Agentic Capability for Select Models
-- Certain AI models possess advanced agentic behaviors, allowing them to perform tasks autonomously.
-- Ideal for use cases that require proactive AI intervention and task management.
-
-### Web Search using Brave API
-- Integrated web search functionality through the Brave Search API.
-- Allows users to retrieve real-time web data directly in their chat conversations.
-- Provides an extensive search capability to enhance informational queries and responses.
 
 ### Image Upload
 - Attach an image to any message using the image button
@@ -49,27 +45,16 @@ Connect to any of the following AI providers:
 - Generated images are displayed inline in the chat
 - Download generated images via the download button or right-click menu
 
-### Tabbed Windows
-- Run multiple independent chats simultaneously using tabs
-- Open a new tab with the **+** button or **Cmd/Ctrl+T**
-- Close a tab with **Cmd/Ctrl+W** or the × button on the tab
-- Double-click a tab title to rename it
-- Drag tabs between windows to reorganize chats
-- Each tab maintains its own conversation history, vendor, and model selection
-- Unsaved tabs are marked with a **•** indicator; you are prompted to save before closing
-
 ### Per-Message Actions
 Each AI response includes:
 - **Copy** — copies the response text to the clipboard
 - **Speak** — reads the response aloud using text-to-speech; click again to stop
 
-### Image Actions
-Click any image to enlarge it in the chat window.
-
+### Right-Click Image Menu
 Right-click any image in the chat to:
 - **Copy Image** — copies the image to the clipboard
 - **Save Image As…** — saves the image to disk via a native save dialog
-- **Zoom** — enlarges the image to fit the chat window
+
 ### Settings
 - Select your **vendor** and **model** from dropdown menus
 - Each vendor stores its own **API key** separately

@@ -81,6 +81,9 @@ function createWindow() {
     icon: appIcon,
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
+  win.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(["microphone", "media"].includes(permission));
+  });
   win.loadFile("index.html");
   if (!mainWin) {
     mainWin = win;
@@ -239,7 +242,7 @@ function openSettings() {
   if (settingsWin) return settingsWin.focus();
   settingsWin = new BrowserWindow({
     width: 420,
-    height: 580,
+    height: 680,
     resizable: false,
     parent: mainWin,
     modal: true,
@@ -413,6 +416,7 @@ ipcMain.handle("settings-save", (_e, newSettings) => {
   const existing = load();
   save({ ...existing, ...newSettings });
   settingsWin?.close();
+  mainWin?.webContents.send("settings-updated");
 });
 
 ipcMain.handle("settings-cancel", () => settingsWin?.close());
@@ -644,6 +648,25 @@ ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode }) 
   }
 });
 
+ipcMain.handle("whisper-transcribe", async (_event, { base64, mimeType }) => {
+  const { apiKeys } = load();
+  const apiKey = apiKeys?.openai || "";
+  if (!apiKey) throw new Error("OpenAI API key not set");
+  const os = require("os");
+  const tmpPath = path.join(os.tmpdir(), `neuropanther-audio-${Date.now()}.webm`);
+  fs.writeFileSync(tmpPath, Buffer.from(base64, "base64"));
+  try {
+    const client = new OpenAI({ apiKey });
+    const transcription = await client.audio.transcriptions.create({
+      model: "whisper-1",
+      file: fs.createReadStream(tmpPath),
+    });
+    return transcription.text;
+  } finally {
+    fs.unlinkSync(tmpPath);
+  }
+});
+
 ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model: modelOverride }) => {
   const settings = load();
   const vendor = vendorOverride || settings.vendor;
@@ -793,6 +816,13 @@ ipcMain.handle("image-context-menu", async (_event, src) => {
           const base64 = src.split(",")[1];
           fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
         }
+      }
+    },
+    {
+      label: "Zoom",
+      click: () => {
+        const win = BrowserWindow.getFocusedWindow() || mainWin;
+        win.webContents.send("zoom-image", src);
       }
     }
   ]);

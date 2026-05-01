@@ -1,6 +1,6 @@
 # NeuroPanther Chat v1.3.0
 
-A cross-platform desktop chatbot application built with Electron that supports multiple AI vendors and models.
+A cross-platform desktop chat/agent application built with Electron that supports multiple AI vendors and models.
 
 *by Richard Lesh*
 
@@ -16,6 +16,19 @@ Connect to any of the following AI providers:
 - **DeepSeek** — DeepSeek Chat, DeepSeek Reasoner
 - **Alibaba** — Qwen Max, Qwen Plus, Qwen Turbo
 - **Meta** — Llama 3.3 70B, Llama 3.1 8B
+
+### Language Translation Capability
+- Seamlessly translate text across multiple languages within chat conversations.
+- Supports real-time translation for more than 100 languages, enabling broader communication and understanding.
+
+### Agentic Capability for Select Models
+- Certain AI models possess advanced agentic behaviors, allowing them to perform tasks autonomously.
+- Ideal for use cases that require proactive AI intervention and task management.
+
+### Web Search using Brave API
+- Integrated web search functionality through the Brave Search API.
+- Allows users to retrieve real-time web data directly in their chat conversations.
+- Provides an extensive search capability to enhance informational queries and responses.
 
 ### Tabbed Windows
 - Run multiple independent chats simultaneously using tabs

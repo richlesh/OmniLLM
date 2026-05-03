@@ -3,7 +3,7 @@ import sys
 import hmac
 import hashlib
 
-SALT = "GlowingCat-NeuroPanther-2026"
+SALT = "NeuroPanther-Chat-2026"
 
 if len(sys.argv) != 2:
     print("Usage: generate_neuropanther_license_key.py <name>")

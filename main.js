@@ -7,7 +7,7 @@ const https = require("https");
 const { spawn } = require("child_process");
 const nodeCrypto = require("crypto");
 const { load, save, VENDORS } = require("./settings");
-const LICENSE_SALT = "GlowingCat-NeuroPanther-2026";
+const LICENSE_SALT = "NeuroPanther-Chat-2026";
 
 function openExternal(url) {
   if (process.platform === "linux") {
@@ -36,18 +36,26 @@ function isValidLicense(key, userName) {
 
 const appIcon = nativeImage.createFromPath(path.join(__dirname, "app_icon.icns"));
 
-app.name = "NeuroPanther";
+app.name = "NeuroPanther Chat";
 
 app.setAboutPanelOptions({
-  applicationName: "NeuroPanther",
+  applicationName: "NeuroPanther Chat",
   applicationVersion: require("./package.json").version,
   credits: `by Richard Lesh\nBuilt with Electron v${process.versions.electron}`,
-  website: "https://glowingcatsoftware.com/NeuroPanther.html",
+  website: "https://glowingcatsoftware.com/NeuroPanther-Chat.html",
   iconImage: appIcon
 });
 
 let mainWin, settingsWin;
 const pendingLoadData = new Map();
+let messageCount = 0;
+
+function checkMessageNag() {
+  messageCount++;
+  if (messageCount % 7 !== 0) return;
+  const { licenseKey, userName } = load();
+  if (!isValidLicense(licenseKey, userName)) showSplash(true);
+}
 
 function loadChatFile(filePath) {
   try {
@@ -97,10 +105,12 @@ function createWindow() {
   return win;
 }
 
+let aboutWin;
 function showAbout() {
-  const aboutWin = new BrowserWindow({
+  if (aboutWin) return aboutWin.focus();
+  aboutWin = new BrowserWindow({
     width: 320,
-    height: 380,
+    height: 420,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -114,8 +124,11 @@ function showAbout() {
   aboutWin.webContents.once("did-finish-load", () => {
     aboutWin.webContents.send("icon-path", path.join(__dirname, "app_icon.png"));
     aboutWin.webContents.send("app-version", require("./package.json").version);
+    const { licenseKey, userName } = load();
+    if (isValidLicense(licenseKey, userName)) aboutWin.webContents.send("licensed");
   });
-  ipcMain.handleOnce("close-about", () => aboutWin.close());
+  ipcMain.handleOnce("close-about", () => aboutWin?.close());
+  aboutWin.on("closed", () => { aboutWin = null; });
 }
 
 function buildMenu() {
@@ -123,7 +136,7 @@ function buildMenu() {
     {
       label: app.name,
       submenu: [
-        { label: "About NeuroPanther", click: showAbout },
+        { label: "About NeuroPanther Chat", click: showAbout },
         { type: "separator" },
         { label: "Settings…", click: openSettings },
         { label: "License Key…", click: openLicense },
@@ -641,6 +654,7 @@ const ANTHROPIC_TOOLS = AGENT_TOOLS.map(t => ({
 }));
 
 ipcMain.on("chat-stream", async (event, { messages, vendor, model, agentMode, sid }) => {
+  checkMessageNag();
   const settings = load();
   const apiKey = settings.apiKeys?.[vendor] || "";
   if (!apiKey && vendor !== "ollama") { event.sender.send("stream-error", sid, "You need to set the API key in Settings before this LLM vendor can be used."); return; }
@@ -755,7 +769,7 @@ ipcMain.handle("whisper-transcribe", async (_event, { base64, mimeType }) => {
   const apiKey = apiKeys?.openai || "";
   if (!apiKey) throw new Error("OpenAI API key not set");
   const os = require("os");
-  const tmpPath = path.join(os.tmpdir(), `neuropanther-audio-${Date.now()}.webm`);
+  const tmpPath = path.join(os.tmpdir(), `neuropanther-chat-audio-${Date.now()}.webm`);
   fs.writeFileSync(tmpPath, Buffer.from(base64, "base64"));
   try {
     const client = new OpenAI({ apiKey });
@@ -771,6 +785,7 @@ ipcMain.handle("whisper-transcribe", async (_event, { base64, mimeType }) => {
 });
 
 ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model: modelOverride }) => {
+  checkMessageNag();
   const settings = load();
   const vendor = vendorOverride || settings.vendor;
   const model  = modelOverride  || settings.model;
@@ -795,12 +810,13 @@ ipcMain.handle("chat", async (_event, { messages, vendor: vendorOverride, model:
 ipcMain.handle("save-temp-image", (_event, { base64, mediaType }) => {
   const os = require("os");
   const ext = mediaType.split("/")[1] || "png";
-  const tempPath = path.join(os.tmpdir(), `neuropanther-img-${Date.now()}.${ext}`);
+  const tempPath = path.join(os.tmpdir(), `neuropanther-chat-img-${Date.now()}.${ext}`);
   fs.writeFileSync(tempPath, Buffer.from(base64, "base64"));
   return tempPath;
 });
 
 ipcMain.handle("chat-with-image", async (_event, { tempPath, mediaType, text, vendor: vendorOverride, model: modelOverride }) => {
+  checkMessageNag();
   const settings = load();
   const vendor = vendorOverride || settings.vendor;
   const model  = modelOverride  || settings.model;
@@ -882,7 +898,7 @@ ipcMain.handle("generate-image", async (_event, { promptText, vendor, sourceImag
   // If a source image is provided, use the edit endpoint
   if (sourceImageBase64) {
     const os = require("os");
-    const tmpPath = path.join(os.tmpdir(), `neuropanther-edit-${Date.now()}.png`);
+    const tmpPath = path.join(os.tmpdir(), `neuropanther-chat-edit-${Date.now()}.png`);
     fs.writeFileSync(tmpPath, Buffer.from(sourceImageBase64, "base64"));
     try {
       const { toFile } = require("openai");
@@ -1040,6 +1056,9 @@ ipcMain.handle("confirm-close-window", async (event, { names }) => {
 
 // ── Window close: ask renderer to check for unsaved tabs ──────────────────────
 const windowsAwaitingClose = new Set();
+let isQuitting = false;
+
+app.on("before-quit", () => { isQuitting = true; });
 
 ipcMain.on("close-confirmed", (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -1049,7 +1068,7 @@ ipcMain.on("close-confirmed", (event) => {
   }
 });
 
-function showSplash() {
+function showSplash(nagOnly) {
   const splash = new BrowserWindow({
     width: 320,
     height: 340,
@@ -1058,6 +1077,8 @@ function showSplash() {
     maximizable: false,
     frame: false,
     icon: appIcon,
+    parent: nagOnly ? mainWin : undefined,
+    modal: !!nagOnly,
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
   splash.loadFile("splash.html");
@@ -1066,10 +1087,12 @@ function showSplash() {
     splash.webContents.send("app-version", require("./package.json").version);
   });
 
-  ipcMain.once("splash-close", () => {
-    splash.close();
-    createWindow();
-  });
+  const handler = () => {
+    if (!splash.isDestroyed()) splash.close();
+    if (!nagOnly) createWindow();
+  };
+  ipcMain.once("splash-close", handler);
+  splash.on("closed", () => ipcMain.removeListener("splash-close", handler));
 }
 
 // Disable Chromium's code block actions menu
@@ -1079,6 +1102,7 @@ app.whenReady().then(() => {
   // Intercept every window's close to check for unsaved tabs
   app.on("browser-window-created", (_e, win) => {
     win.on("close", (e) => {
+      if (isQuitting) return;
       if (["settings", "about", "splash", "license"].some(p => win.webContents.getURL().includes(p))) return;
       if (windowsAwaitingClose.has(win.id)) {
         windowsAwaitingClose.delete(win.id);

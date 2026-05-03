@@ -1,8 +1,8 @@
-# NeuroPanther — Project Structure
+# NeuroPanther Chat — Project Structure
 
 ## Directory Layout
 ```
-NeuroPanther/
+NeuroPanther-Chat/
 ├── main.js                          # Electron main process — app lifecycle, IPC, API calls
 ├── index.html                       # Main chat renderer — UI, tabs, chat bubbles
 ├── settings.html                    # Settings window — vendor/model/API key UI
@@ -13,7 +13,7 @@ NeuroPanther/
 ├── config.json                      # Vendor/model/URL configuration (data-driven)
 ├── package.json                     # npm config, electron-builder config, dependencies
 ├── app_icon.png / .icns / .ico      # App icons for all platforms
-├── generate_neuropanther_license_key.py  # Standalone utility: license key generation
+├── generate_neuropanther_chat_license_key.py  # Standalone utility: license key generation
 ├── .gitignore
 └── .amazonq/rules/memory-bank/      # Amazon Q memory bank documentation
 ```
@@ -25,7 +25,7 @@ The central orchestrator. Responsibilities:
 - Electron app/window lifecycle (BrowserWindow creation, splash screen)
 - IPC handlers for all renderer↔main communication
 - All AI vendor API calls (OpenAI SDK, Anthropic SDK, Google GenAI SDK)
-- Settings read/write to `~/.neuropanther-settings.json`
+- Settings read/write to `~/.neuropanther-chat-settings.json`
 - Native menus (application menu, context menus)
 - Tab drag-and-drop between windows
 - File dialog for image save
@@ -68,7 +68,7 @@ DeepSeek, Alibaba, Meta, and Google all use the OpenAI Node SDK with a custom `b
 Adding a new vendor requires only a `config.json` entry — no code changes needed for standard text chat vendors using OpenAI-compatible APIs.
 
 ### Single Settings File
-All user preferences (API keys per vendor, selected vendor/model) are stored in one JSON file at `~/.neuropanther-settings.json`, read/written by the main process.
+All user preferences (API keys per vendor, selected vendor/model) are stored in one JSON file at `~/.neuropanther-chat-settings.json`, read/written by the main process.
 
 ### Renderer-Side State
 Each tab's state (conversation history, vendor, model, pending image) is managed entirely in the renderer's in-memory JS objects, keyed by tab ID.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="disable-code-actions" content="true">
-  <title>NeuroPanther</title>
+  <title>NeuroPanther Chat</title>
   <link rel="stylesheet" href="node_modules/highlight.js/styles/github-dark.css" media="screen">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono+NL:ital,wght@0,100..800;1,100..800&display=swap">
   <style id="theme">
@@ -745,7 +745,7 @@
       if (val) {
         tab.title = val;
         titleSpan.textContent = val;
-        if (id === activeTabId) document.title = "NeuroPanther";
+        if (id === activeTabId) document.title = "NeuroPanther Chat";
       }
       titleInput.style.display = "none";
       titleSpan.style.display = "";
@@ -783,7 +783,7 @@
       activeTabId = id;
       const tab = tabs[id];
       tab.domEl.classList.add("active");
-      document.title = "NeuroPanther";
+      document.title = "NeuroPanther Chat";
 
       // attach this tab's container
       chatEl.appendChild(tab.container);

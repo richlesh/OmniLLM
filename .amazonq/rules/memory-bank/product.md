@@ -1,7 +1,7 @@
-# NeuroPanther — Product Overview
+# NeuroPanther Chat — Product Overview
 
 ## Purpose
-NeuroPanther is a cross-platform desktop chat application built with Electron that provides a unified interface for interacting with multiple AI vendors and models. It eliminates the need to switch between different web interfaces by consolidating access to major LLM providers in one native desktop app.
+NeuroPanther Chat is a cross-platform desktop chat application built with Electron that provides a unified interface for interacting with multiple AI vendors and models. It eliminates the need to switch between different web interfaces by consolidating access to major LLM providers in one native desktop app.
 
 ## Version
 1.3.0
@@ -35,7 +35,7 @@ NeuroPanther is a cross-platform desktop chat application built with Electron th
 
 ### Settings & Configuration
 - Per-vendor API key storage
-- Settings persisted to `~/.neuropanther-settings.json`
+- Settings persisted to `~/.neuropanther-chat-settings.json`
 - Vendor/model selection via dropdowns
 - Direct links to each vendor's API key page
 

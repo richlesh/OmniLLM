@@ -1,4 +1,4 @@
-# NeuroPanther — Development Guidelines
+# NeuroPanther Chat — Development Guidelines
 
 ## Code Style & Formatting
 
@@ -15,7 +15,7 @@
 - **Variables/functions**: camelCase (`createWindow`, `openSettings`, `vendorCfg`)
 - **Constants**: camelCase for module-level (`SETTINGS_PATH`, `VENDORS`, `LICENSE_SALT` are SCREAMING_SNAKE for true constants)
 - **IPC channel names**: kebab-case strings (`"chat"`, `"save-chat-dialog"`, `"get-vendors-and-settings"`)
-- **File names**: kebab-case (`settings.js`, `generate_neuropanther_license_key.py`)
+- **File names**: kebab-case (`settings.js`, `generate_neuropanther_chat_license_key.py`)
 - **HTML files**: lowercase, descriptive (`about.html`, `splash.html`, `license.html`)
 
 ## IPC Architecture Pattern
@@ -123,8 +123,8 @@ if (!filePath) return; // user cancelled — always guard
 
 ## License Key Pattern
 
-HMAC-SHA256 based, shared between JS (main.js) and Python (generate_neuropanther_license_key.py):
-- Salt: `"GlowingCat-NeuroPanther-2026"`
+HMAC-SHA256 based, shared between JS (main.js) and Python (generate_neuropanther_chat_license_key.py):
+- Salt: `"NeuroPanther-Chat-2026"`
 - Input: `userName.toLowerCase().trim()`
 - Output: first 16 hex chars, uppercased
 - Validation: constant-time string comparison after normalizing to uppercase

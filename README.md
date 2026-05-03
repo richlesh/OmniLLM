@@ -78,7 +78,7 @@ Right-click any image in the chat to:
 - Select your **vendor** and **model** from dropdown menus
 - Each vendor stores its own **API key** separately
 - A direct link to each vendor's API key page is shown for convenience
-- Settings are saved to `~/.neuropanther-settings.json`
+- Settings are saved to `~/.neuropanther-chat-settings.json`
 
 ### Vendor Configuration
 Vendors, models, and API key URLs are defined in `config.json` making it easy to add new vendors or models without changing any code.
@@ -93,8 +93,8 @@ Vendors, models, and API key URLs are defined in `config.json` making it easy to
 
 ### Setup
 ```bash
-git clone https://github.com/richlesh/NeuroPanther.git
-cd NeuroPanther
+git clone https://github.com/richlesh/NeuroPanther-Chat.git
+cd NeuroPanther-Chat
 npm install
 ```
 
@@ -103,7 +103,7 @@ npm install
 npm start
 ```
 
-On first launch, open **NeuroPanther → Settings…** to enter your API key for your chosen vendor.
+On first launch, open **NeuroPanther Chat → Settings…** to enter your API key for your chosen vendor.
 
 ---
 

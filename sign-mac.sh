@@ -40,5 +40,5 @@ sign_app() {
   codesign --verify --deep --strict "$APP" && echo "OK" || echo "FAILED"
 }
 
-sign_app "dist/mac/NeuroPanther.app"
-sign_app "dist/mac-arm64/NeuroPanther.app"
+sign_app "dist/mac/NeuroPanther-Chat.app"
+sign_app "dist/mac-arm64/NeuroPanther-Chat.app"

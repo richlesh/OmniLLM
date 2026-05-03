@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-const SETTINGS_PATH = path.join(os.homedir(), ".neuropanther-settings.json");
+const SETTINGS_PATH = path.join(os.homedir(), ".neuropanther-chat-settings.json");
 const { vendors: VENDORS } = require("./config.json");
 
 const DEFAULTS = { vendor: "openai", model: "gpt-4o-mini", apiKeys: {} };

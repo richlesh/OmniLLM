@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>About NeuroPanther</title>
+  <title>About NeuroPanther Chat</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -44,15 +44,16 @@
 </head>
 <body>
   <img id="icon">
-  <h1>NeuroPanther</h1>
+  <h1>NeuroPanther Chat</h1>
   <p>
     Version <span id="app-version"></span><br>
     ©2026 Richard Lesh<br>
     Built with Electron v<span id="electron-version"></span><br>
-    <a id="website" href="https://glowingcat.com/NeuroPanther.html">Glowing Cat Software</a><br>
-    <a id="issues" href="https://github.com/richlesh/NeuroPanther/issues">Report issues on GitHub</a>
+    <a id="website" href="https://glowingcat.com/NeuroPanther-Chat.html">Glowing Cat Software</a><br>
+    <a id="issues" href="https://github.com/richlesh/NeuroPanther-Chat/issues">Report issues on GitHub</a>
   </p>
   <button id="ok-btn">OK</button>
+  <p id="thank-you" style="display:none;font-weight:600;">Thank you for donating to<br>Glowing Cat Software!</p>
 
   <script>
     const { ipcRenderer } = require("electron");
@@ -67,14 +68,18 @@
       document.getElementById("app-version").textContent = version;
     });
 
+    ipcRenderer.on("licensed", () => {
+      document.getElementById("thank-you").style.display = "";
+    });
+
     document.getElementById("website").addEventListener("click", e => {
       e.preventDefault();
-      ipcRenderer.invoke("open-external", "https://glowingcat.com/NeuroPanther.html");
+      ipcRenderer.invoke("open-external", "https://glowingcat.com/NeuroPanther-Chat.html");
     });
 
     document.getElementById("issues").addEventListener("click", e => {
       e.preventDefault();
-      ipcRenderer.invoke("open-external", "https://github.com/richlesh/NeuroPanther/issues");
+      ipcRenderer.invoke("open-external", "https://github.com/richlesh/NeuroPanther-Chat/issues");
     });
 
     document.getElementById("ok-btn").addEventListener("click", () => {

@@ -18,7 +18,7 @@
     "appId": "com.richardlesh.neuropanther-chat",
     "productName": "NeuroPanther Chat",
     "icon": "app_icon",
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "artifactName": "NeuroPanther-Chat-${version}-${arch}.${ext}",
     "files": [
       "*.js",
       "*.html",

@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="disable-code-actions" content="true">
   <title>NeuroPanther</title>
   <link rel="stylesheet" href="node_modules/highlight.js/styles/github-dark.css" media="screen">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono+NL:ital,wght@0,100..800;1,100..800&display=swap">
@@ -67,8 +68,39 @@
     .msg.assistant li { margin-bottom: 2px; }
     .msg.assistant h1, .msg.assistant h2, .msg.assistant h3 { margin: 8px 0 4px; }
     .msg.assistant code { background: #1a1a1a; padding: 1px 5px; border-radius: 4px; font-size: 13px; font-family: 'JetBrains Mono NL', monospace; }
-    .msg.assistant pre { margin: 8px 0; border-radius: 8px; overflow-x: auto; position: relative; }
-    .msg.assistant pre code { background: none; padding: 0; font-size: 13px; font-family: 'JetBrains Mono NL', monospace; }
+    .msg.assistant pre { 
+      margin: 8px 0; 
+      border-radius: 8px; 
+      overflow-x: auto; 
+      position: relative; 
+      -webkit-user-select: text; 
+      user-select: text;
+      min-height: 40px;
+      padding: 10px;
+    }
+    .msg.assistant pre::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .msg.assistant pre code { 
+      background: none; 
+      padding: 0; 
+      font-size: 13px; 
+      font-family: 'JetBrains Mono NL', monospace; 
+      -webkit-user-select: text; 
+      user-select: text;
+    }
+    pre, code { -webkit-user-modify: read-only; }
+    
+    /* Disable Chromium's code block actions menu */
+    pre::-webkit-details-marker { display: none !important; }
+    code::-webkit-details-marker { display: none !important; }
+    
+    /* Hide any code action UI elements */
+    code-action, code-action-button, [class*="code-action"] { display: none !important; }
+    pre::part(code-action), code::part(code-action) { display: none !important; }
     .code-copy-btn {
       position: absolute;
       top: 6px;
@@ -77,11 +109,14 @@
       border: none;
       color: #ccc;
       border-radius: 5px;
-      padding: 3px 8px;
+      padding: 4px 6px;
       font-size: 11px;
       cursor: pointer;
       opacity: 0;
       transition: opacity 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .msg.assistant pre:hover .code-copy-btn { opacity: 1; }
     .code-copy-btn:hover { background: #555; color: #fff; }
@@ -528,6 +563,12 @@
     const { marked } = require("marked");
     const hljs = require("highlight.js");
 
+    // Remove Chromium code action elements
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll('[class*="code-action"], code-action, code-action-button').forEach(el => el.remove());
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
     marked.use({
       renderer: (() => {
         const r = new marked.Renderer();
@@ -724,17 +765,6 @@
       // attach this tab's container
       chatEl.appendChild(tab.container);
       chatEl.scrollTop = chatEl.scrollHeight;
-
-      // re-wire code copy buttons
-      tab.container.querySelectorAll("pre").forEach(pre => {
-        const copyBtn = pre.querySelector(".code-copy-btn");
-        if (!copyBtn) return;
-        copyBtn.onclick = () => {
-          navigator.clipboard.writeText(pre.querySelector("code").innerText);
-          copyBtn.textContent = "Copied!";
-          setTimeout(() => copyBtn.textContent = "Copy", 1500);
-        };
-      });
 
       // sync imagine mode UI
       imagineBtn.classList.toggle("active", tab.imagineMode);
@@ -1124,10 +1154,25 @@
 
     // right-click context menu on any image in the chat
     chatEl.addEventListener("contextmenu", e => {
+      // Prevent context menu on code blocks
+      if (e.target.tagName === "CODE" || e.target.tagName === "PRE" || e.target.closest("pre")) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if (e.target.tagName !== "IMG") return;
       e.preventDefault();
       ipcRenderer.invoke("image-context-menu", e.target.src);
     });
+
+    // Global prevention for code block context menus
+    document.addEventListener("contextmenu", e => {
+      if (e.target.tagName === "CODE" || e.target.tagName === "PRE" || e.target.closest("pre")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    }, true);
 
     // click image to view full size
     const imgModal    = document.getElementById("img-modal");
@@ -1666,7 +1711,15 @@
       bar.className = "msg-actions";
 
       const copy = btn("Copy", `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`);
-      copy.addEventListener("click", () => ipcRenderer.invoke("copy-to-clipboard", plainText));
+      const copyIconSvg = copy.innerHTML;
+      const checkIconSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+      copy.addEventListener("click", () => {
+        ipcRenderer.invoke("copy-to-clipboard", plainText);
+        copy.innerHTML = checkIconSvg;
+        setTimeout(() => {
+          copy.innerHTML = copyIconSvg;
+        }, 800);
+      });
 
       const speak = btn("Speak", `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`);
       speak.addEventListener("click", () => {
@@ -1703,13 +1756,21 @@
 
     function addCodeCopyButtons(el) {
       el.querySelectorAll("pre").forEach(pre => {
+        // Skip if button already exists
+        if (pre.querySelector(".code-copy-btn")) return;
+        
         const copyBtn = document.createElement("button");
         copyBtn.className = "code-copy-btn";
-        copyBtn.textContent = "Copy";
-        copyBtn.addEventListener("click", () => {
-          navigator.clipboard.writeText(pre.querySelector("code").innerText);
-          copyBtn.textContent = "Copied!";
-          setTimeout(() => copyBtn.textContent = "Copy", 1500);
+        copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        copyBtn.title = "Copy code";
+        copyBtn.addEventListener("click", async () => {
+          const code = pre.querySelector("code");
+          const textToCopy = code ? code.innerText : pre.innerText;
+          await ipcRenderer.invoke("copy-to-clipboard", textToCopy);
+          copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00FF00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+          setTimeout(() => {
+            copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+          }, 1500);
         });
         pre.appendChild(copyBtn);
       });

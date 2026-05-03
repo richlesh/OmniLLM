@@ -79,7 +79,12 @@ function createWindow() {
     width: 1000,
     height: 700,
     icon: appIcon,
-    webPreferences: { nodeIntegration: true, contextIsolation: false }
+    webPreferences: { 
+      nodeIntegration: true, 
+      contextIsolation: false,
+      enableBlinkFeatures: '',
+      disableBlinkFeatures: 'AutomationControlled'
+    }
   });
   win.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) => {
     callback(["microphone", "media"].includes(permission));
@@ -205,7 +210,21 @@ function buildMenu() {
       ]
     },
     { role: "editMenu" },
-    { role: "windowMenu" }
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        { type: "separator" },
+        {
+          label: "Toggle Developer Tools",
+          accelerator: process.platform === "darwin" ? "Cmd+Option+I" : "Ctrl+Shift+I",
+          click: () => BrowserWindow.getFocusedWindow()?.webContents.toggleDevTools()
+        },
+        { type: "separator" },
+        { role: "front" }
+      ]
+    }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -732,10 +751,32 @@ ipcMain.handle("chat-with-image", async (_event, { tempPath, mediaType, text, ve
   const vendor = vendorOverride || settings.vendor;
   const model  = modelOverride  || settings.model;
   const apiKey = settings.apiKeys?.[vendor] || "";
-  if (!apiKey) throw new Error("You need to set the API key in Settings before this LLM vendor can be used.");
+  
+  if (vendor !== "ollama" && !apiKey) {
+    throw new Error("You need to set the API key in Settings before this LLM vendor can be used.");
+  }
 
   const base64 = fs.readFileSync(tempPath).toString("base64");
   fs.unlinkSync(tempPath);
+
+  if (vendor === "ollama") {
+    const client = new OpenAI({ apiKey: "ollama", baseURL: "http://localhost:11434/v1" });
+    try {
+      const res = await client.chat.completions.create({
+        model,
+        messages: [{ role: "user", content: [
+          { type: "text", text: text || "What is in this image?" },
+          { type: "image_url", image_url: { url: `data:${mediaType};base64,${base64}` } }
+        ]}]
+      });
+      return res.choices[0].message.content;
+    } catch (err) {
+      if (err.message?.includes("does not support images")) {
+        throw new Error(`The model "${model}" does not support image analysis. Try a vision-capable model like llava or llama3.2-vision.`);
+      }
+      throw err;
+    }
+  }
 
   if (vendor === "anthropic") {
     const client = new Anthropic({ apiKey });
@@ -976,6 +1017,9 @@ function showSplash() {
     createWindow();
   });
 }
+
+// Disable Chromium's code block actions menu
+app.commandLine.appendSwitch('disable-features', 'ContextMenuEnableCodeActions');
 
 app.whenReady().then(() => {
   // Intercept every window's close to check for unsaved tabs

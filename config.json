@@ -44,9 +44,34 @@
       "imageGeneration": true,
       "imageModel": "imagen-4.0-generate-001"
     },
+    "stability": {
+      "label": "Stability AI",
+      "models": ["sd3.5-large"],
+      "apiKeyUrl": "https://platform.stability.ai/account/keys",
+      "imageGeneration": true,
+      "imageModel": "sd3.5-large",
+      "imageOnly": true
+    },
+    "leonardo": {
+      "label": "Leonardo",
+      "models": ["de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3"],
+      "apiKeyUrl": "https://app.leonardo.ai/api-access",
+      "imageGeneration": true,
+      "imageModel": "de7d3faf-762f-48e0-b3b7-9d0ac3a3fcf3",
+      "imageOnly": true
+    },
+    "ideogram": {
+      "label": "Ideogram",
+      "models": ["ideogram-v3"],
+      "apiKeyUrl": "https://ideogram.ai/manage-api",
+      "imageGeneration": true,
+      "imageModel": "ideogram-v3",
+      "imageOnly": true
+    },
     "ollama": {
       "label": "Ollama",
       "models": [],
+      "apiKeyUrl": "https://ollama.com/settings/keys",
       "baseURL": "http://localhost:11434/v1",
       "imageGeneration": false
     }

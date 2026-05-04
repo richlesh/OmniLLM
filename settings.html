@@ -74,6 +74,7 @@
     <label>API Key</label>
     <input id="apiKey" type="password" placeholder="Enter API key…">
     <a id="api-key-link" href="#" target="_blank">Get API key…</a>
+    <span id="api-key-note" style="font-size: 11px; color: #888; margin-left: 6px; display: none;">(only required for cloud models)</span>
   </div>
 
   <!-- Agent Settings -->
@@ -141,7 +142,7 @@
       current = settings;
       if (!current.defaultModels) current.defaultModels = {};
 
-      for (const [key, v] of Object.entries(vendors)) {
+      for (const [key, v] of Object.entries(vendors).sort((a, b) => a[1].label.localeCompare(b[1].label))) {
         const opt = document.createElement("option");
         opt.value = key;
         opt.textContent = v.label;
@@ -181,12 +182,10 @@
 
     function updateLink(vendor) {
       const apiKeySection = document.getElementById("api-key-section");
-      if (vendor === "ollama") {
-        apiKeySection.style.display = "none";
-      } else {
-        apiKeySection.style.display = "";
-        apiKeyLink.href = vendors[vendor].apiKeyUrl || "#";
-      }
+      const apiKeyNote = document.getElementById("api-key-note");
+      apiKeySection.style.display = "";
+      apiKeyLink.href = vendors[vendor].apiKeyUrl || "#";
+      apiKeyNote.style.display = vendor === "ollama" ? "inline" : "none";
     }
 
     async function populateModels(vendor, savedModel) {
@@ -200,7 +199,7 @@
       }
       if (!models || models.length === 0) models = vendors[vendor].models;
       modelSel.innerHTML = "";
-      for (const m of models) {
+      for (const m of [...models].sort((a, b) => a.localeCompare(b))) {
         const opt = document.createElement("option");
         opt.value = m;
         opt.textContent = m;

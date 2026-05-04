@@ -61,6 +61,7 @@
     .msg.user      { align-self: flex-end; background: var(--user-bubble); color: var(--user-bubble-text); white-space: pre-wrap; }
     .msg.assistant { align-self: flex-start; background: var(--ai-bubble); }
     .msg.error     { align-self: flex-start; background: #5a1a1a; color: #ff6b6b; }
+    .msg.info      { align-self: center; background: transparent; color: #888; font-size: 12px; padding: 4px 0; }
 
     .msg.assistant p { margin: 0 0 8px; }
     .msg.assistant p:last-child { margin-bottom: 0; }
@@ -532,18 +533,18 @@
     <select id="model-select" title="Model"></select>
     <button class="icon-btn" id="attach-btn" title="Attach file(s)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-        <polyline points="21 15 16 10 5 21"/>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
       </svg>
     </button>
     <button class="icon-btn" id="imagine-btn" title="Generate Image">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
       </svg>
     </button>
     <button class="icon-btn" id="agent-btn" title="Agent Mode">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+        <rect x="4" y="8" width="16" height="12" rx="2"/><line x1="12" y1="8" x2="12" y2="4"/><circle cx="12" cy="3" r="1"/><circle cx="9" cy="14" r="1.5"/><circle cx="15" cy="14" r="1.5"/><line x1="1" y1="13" x2="4" y2="13"/><line x1="20" y1="13" x2="23" y2="13"/>
       </svg>
     </button>
     <button class="icon-btn" id="translate-btn" title="Translate">
@@ -826,7 +827,7 @@
     function activeTab() { return tabs[activeTabId]; }
 
     function applyVendorLock(tab) {
-      const locked = tab ? tab.locked : false;
+      const locked = tab ? (tab.locked && !tab.imagineMode) : false;
       vendorSel.disabled = locked;
       modelSel.disabled  = locked;
       const tip = locked ? "Vendor/model locked — start a new tab to change" : "";
@@ -894,6 +895,11 @@
             div.appendChild(p);
           }
           container.appendChild(div);
+        } else if (msg.role === "info") {
+          const div = document.createElement("div");
+          div.className = "msg info";
+          div.textContent = msg.content;
+          container.appendChild(div);
         } else {
           const div = document.createElement("div");
           div.className = "msg assistant";
@@ -937,6 +943,11 @@
             div.textContent = msg.content;
             tmp.appendChild(div);
           }
+        } else if (msg.role === "info") {
+          const div = document.createElement("div");
+          div.className = "msg info";
+          div.textContent = msg.content;
+          tmp.appendChild(div);
         } else {
           const div = document.createElement("div");
           div.className = "msg assistant";
@@ -991,6 +1002,7 @@
         const tab = activeTab();
         if (tab) tab.vendor = vendorSel.value;
         populateVendorSelect(allVendors, vendorSel.value, tab ? tab.imagineMode : false);
+        if (tab?.imagineMode) showImageGenInfo();
       });
 
       if (pendingLoad) {
@@ -1008,8 +1020,10 @@
     function populateVendorSelectOnly(vendors, selectedVendor, imagineOnly) {
       const current = selectedVendor || vendorSel.value;
       vendorSel.innerHTML = "";
-      for (const [key, v] of Object.entries(vendors)) {
-        if (imagineOnly && !v.imageGeneration) continue;
+      const entries = Object.entries(vendors)
+        .filter(([, v]) => !(imagineOnly && !v.imageGeneration) && !(!imagineOnly && v.imageOnly))
+        .sort((a, b) => a[1].label.localeCompare(b[1].label));
+      for (const [key, v] of entries) {
         const opt = document.createElement("option");
         opt.value = key; opt.textContent = v.label;
         if (key === "ollama" && !ollamaAvailable) {
@@ -1043,7 +1057,7 @@
         opt.value = ""; opt.textContent = "API Key Not Set"; opt.disabled = true;
         modelSel.appendChild(opt);
       } else {
-        for (const m of models) {
+        for (const m of [...models].sort((a, b) => a.localeCompare(b))) {
           const opt = document.createElement("option");
           opt.value = m; opt.textContent = m;
           modelSel.appendChild(opt);
@@ -1280,6 +1294,7 @@
       populateVendorSelect(allVendors, vendorSel.value, false);
       modelSel.style.display = "";
       clearAttachments();
+      applyVendorLock(tab);
     }
 
     imagineBtn.addEventListener("click", () => {
@@ -1293,6 +1308,8 @@
         prompt.placeholder = "Describe an image to generate…";
         populateVendorSelect(allVendors, vendorSel.value, true);
         modelSel.style.display = "none";
+        applyVendorLock(tab);
+        showImageGenInfo();
       }
     });
 
@@ -1509,6 +1526,17 @@
       if (tabId === activeTabId) chatEl.scrollTop = chatEl.scrollHeight;
       sendBtn.disabled = false;
       prompt.focus();
+    }
+
+    function showImageGenInfo() {
+      const tab = activeTab();
+      if (!tab || !tab.imagineMode) return;
+      const v = allVendors[vendorSel.value];
+      if (!v) return;
+      const model = v.imageModel || vendorSel.value;
+      const text = `Using ${v.label} / ${model}`;
+      addMessage("info", text);
+      tab.chatLog.push({ role: "info", content: text });
     }
 
     function addMessage(role, text, tabId = activeTabId) {

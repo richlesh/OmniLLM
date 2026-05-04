@@ -893,6 +893,76 @@ ipcMain.handle("generate-image", async (_event, { promptText, vendor, sourceImag
     return `data:image/png;base64,${b64}`;
   }
 
+  if (vendor === "stability") {
+    const form = new FormData();
+    form.append("prompt", promptText);
+    form.append("model", vendorCfg.imageModel);
+    form.append("output_format", "png");
+    const res = await fetch("https://api.stability.ai/v2beta/stable-image/generate/sd3", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKeys.stability}`, "Accept": "image/*" },
+      body: form
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message || `Stability AI error ${res.status}`);
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    return `data:image/png;base64,${buf.toString("base64")}`;
+  }
+
+  if (vendor === "leonardo") {
+    const apiKey = apiKeys.leonardo;
+    const baseUrl = "https://cloud.leonardo.ai/api/rest/v1";
+    const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Accept": "application/json" };
+    const genRes = await fetch(`${baseUrl}/generations`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ prompt: promptText, modelId: vendorCfg.imageModel, num_images: 1, width: 1024, height: 1024, contrast: 3.5 })
+    });
+    if (!genRes.ok) {
+      const err = await genRes.json().catch(() => ({ message: genRes.statusText }));
+      throw new Error(err.message || `Leonardo error ${genRes.status}`);
+    }
+    const genData = await genRes.json();
+    const generationId = genData.sdGenerationJob?.generationId;
+    if (!generationId) throw new Error("Leonardo did not return a generation ID");
+    // Poll for completion
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const pollRes = await fetch(`${baseUrl}/generations/${generationId}`, { headers: { "Authorization": `Bearer ${apiKey}`, "Accept": "application/json" } });
+      if (!pollRes.ok) continue;
+      const pollData = await pollRes.json();
+      const gen = pollData.generations_by_pk;
+      if (gen?.status === "COMPLETE" && gen.generated_images?.length) {
+        const imgRes = await fetch(gen.generated_images[0].url);
+        return `data:image/png;base64,${Buffer.from(await imgRes.arrayBuffer()).toString("base64")}`;
+      }
+      if (gen?.status === "FAILED") throw new Error("Leonardo image generation failed");
+    }
+    throw new Error("Leonardo image generation timed out");
+  }
+
+  if (vendor === "ideogram") {
+    const form = new FormData();
+    form.append("prompt", promptText);
+    form.append("rendering_speed", "DEFAULT");
+    const res = await fetch("https://api.ideogram.ai/v1/ideogram-v3/generate", {
+      method: "POST",
+      headers: { "Api-Key": apiKeys.ideogram },
+      body: form
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message || `Ideogram error ${res.status}`);
+    }
+    const data = await res.json();
+    const imageUrl = data.data?.[0]?.url;
+    if (!imageUrl) throw new Error("Ideogram did not return an image URL");
+    const imgRes = await fetch(imageUrl);
+    return `data:image/png;base64,${Buffer.from(await imgRes.arrayBuffer()).toString("base64")}`;
+  }
+
   const client = new OpenAI({ apiKey: apiKeys[vendor] });
 
   // If a source image is provided, use the edit endpoint
